@@ -97,6 +97,32 @@ const dockCss = `
 .sk-icon-button:hover {
 	opacity: 1;
 }
+.sk-icon-button.active {
+	color: #ff3e00;
+	opacity: 1;
+}
+.sk-inspect-box {
+	position: fixed;
+	z-index: 2147483646;
+	pointer-events: none;
+	display: none;
+	border: 1px solid #ff3e00;
+	background: rgba(255, 62, 0, 0.1);
+	border-radius: 2px;
+}
+.sk-inspect-label {
+	position: fixed;
+	z-index: 2147483646;
+	pointer-events: none;
+	display: none;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background: #ff3e00;
+	color: #fff;
+	font: 11px/1.5 ui-monospace, 'DM Mono', monospace;
+	white-space: nowrap;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
 .sk-icon-button svg {
 	height: 1.2em;
 	width: 1.2em;
@@ -291,6 +317,16 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 	panel.appendChild(toggleBtn);
 	panel.appendChild(divider);
 	panel.appendChild(label);
+
+	var inspectDivider = document.createElement('div');
+	inspectDivider.className = 'sk-panel-content sk-divider';
+	var inspectBtn = document.createElement('button');
+	inspectBtn.className = 'sk-icon-button sk-panel-content';
+	inspectBtn.setAttribute('title', 'Inspect component — click an element to open its source');
+	inspectBtn.innerHTML =
+		'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="3.5"/></svg>';
+	panel.appendChild(inspectDivider);
+	panel.appendChild(inspectBtn);
 	anchor.appendChild(glow);
 	anchor.appendChild(panel);
 
@@ -543,6 +579,96 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		}
 	});
 	window.addEventListener('popstate', sendHostState);
+
+	// Component inspector: hover highlights the nearest Svelte element, click opens
+	// its source. Svelte adds __svelte_meta.loc (file/line/column) to DOM nodes in dev.
+	var inspecting = false;
+	var inspectBox = document.createElement('div');
+	inspectBox.className = 'sk-inspect-box';
+	var inspectLabel = document.createElement('div');
+	inspectLabel.className = 'sk-inspect-label';
+	root.appendChild(inspectBox);
+	root.appendChild(inspectLabel);
+
+	function inspectFind(el) {
+		while (el && el !== document.body && el !== document.documentElement) {
+			if (el.__svelte_meta && el.__svelte_meta.loc) return { el: el, loc: el.__svelte_meta.loc };
+			el = el.parentElement;
+		}
+		return null;
+	}
+	function inspectTargetAt(x, y) {
+		var el = document.elementFromPoint(x, y);
+		if (!el || host.contains(el)) return null;
+		return inspectFind(el);
+	}
+	function inspectMove(e) {
+		var found = inspectTargetAt(e.clientX, e.clientY);
+		if (!found) {
+			inspectBox.style.display = 'none';
+			inspectLabel.style.display = 'none';
+			return;
+		}
+		var r = found.el.getBoundingClientRect();
+		inspectBox.style.display = 'block';
+		inspectBox.style.left = r.left + 'px';
+		inspectBox.style.top = r.top + 'px';
+		inspectBox.style.width = r.width + 'px';
+		inspectBox.style.height = r.height + 'px';
+		inspectLabel.style.display = 'block';
+		inspectLabel.textContent = found.loc.file + ':' + found.loc.line;
+		var labelTop = r.top - 22;
+		inspectLabel.style.left = r.left + 'px';
+		inspectLabel.style.top = (labelTop < 2 ? r.bottom + 4 : labelTop) + 'px';
+	}
+	function inspectClick(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		var found = inspectTargetAt(e.clientX, e.clientY);
+		stopInspect();
+		if (found) {
+			fetch(BASE + 'api/open-in-editor', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					file: found.loc.file,
+					line: found.loc.line,
+					column: found.loc.column,
+				}),
+			}).catch(function () {});
+		}
+	}
+	function inspectKey(e) {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			stopInspect();
+		}
+	}
+	function startInspect() {
+		if (inspecting) return;
+		inspecting = true;
+		inspectBtn.classList.add('active');
+		document.addEventListener('mousemove', inspectMove, true);
+		document.addEventListener('click', inspectClick, true);
+		document.addEventListener('keydown', inspectKey, true);
+		document.documentElement.style.cursor = 'crosshair';
+	}
+	function stopInspect() {
+		if (!inspecting) return;
+		inspecting = false;
+		inspectBtn.classList.remove('active');
+		document.removeEventListener('mousemove', inspectMove, true);
+		document.removeEventListener('click', inspectClick, true);
+		document.removeEventListener('keydown', inspectKey, true);
+		document.documentElement.style.cursor = '';
+		inspectBox.style.display = 'none';
+		inspectLabel.style.display = 'none';
+	}
+	inspectBtn.addEventListener('click', function (e) {
+		e.stopPropagation();
+		if (inspecting) stopInspect();
+		else startInspect();
+	});
 
 	function formatDuration(ms) {
 		if (ms < 1000) return [String(Math.round(ms)), 'ms'];
