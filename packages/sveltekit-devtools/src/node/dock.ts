@@ -90,6 +90,46 @@ const dockCss = `
 	height: 1.2em;
 	width: 1.2em;
 }
+.sk-anchor.vertical .sk-icon-button {
+	transform: rotate(-90deg);
+}
+.sk-panel-content {
+	transition: opacity 0.4s ease;
+}
+.sk-anchor.hide .sk-panel-content {
+	opacity: 0;
+}
+.sk-divider {
+	flex: none;
+	width: 1px;
+	height: 10px;
+	border-left: 1px solid #8883;
+}
+.sk-label {
+	padding: 0 7px 0 8px;
+	font-size: 0.8em;
+	line-height: 1em;
+	display: flex;
+	gap: 3px;
+	align-items: center;
+	white-space: nowrap;
+}
+.sk-label-main {
+	opacity: 0.8;
+	white-space: nowrap;
+}
+.sk-label-secondary {
+	font-size: 0.8em;
+	line-height: 0.6em;
+	opacity: 0.5;
+	white-space: nowrap;
+}
+.sk-anchor.vertical .sk-label {
+	transform: rotate(-90deg);
+	flex-direction: column;
+	gap: 2px;
+	padding: 0 10px;
+}
 .sk-anchor:hover .sk-glow {
 	opacity: 0.6;
 }
@@ -222,7 +262,22 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 	toggleBtn.setAttribute('title', 'Toggle SvelteKit DevTools');
 	toggleBtn.innerHTML = ${JSON.stringify(svelteLogoSvg)};
 
+	var divider = document.createElement('div');
+	divider.className = 'sk-panel-content sk-divider';
+
+	var label = document.createElement('div');
+	label.className = 'sk-panel-content sk-label';
+	label.setAttribute('title', 'Page load time');
+	var labelMain = document.createElement('div');
+	labelMain.className = 'sk-label-main';
+	var labelSecondary = document.createElement('span');
+	labelSecondary.className = 'sk-label-secondary';
+	label.appendChild(labelMain);
+	label.appendChild(labelSecondary);
+
 	panel.appendChild(toggleBtn);
+	panel.appendChild(divider);
+	panel.appendChild(label);
 	anchor.appendChild(glow);
 	anchor.appendChild(panel);
 
@@ -408,6 +463,31 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 
 	anchor.addEventListener('mousemove', bringUp);
 	window.addEventListener('resize', render);
+
+	function formatDuration(ms) {
+		if (ms < 1000) return [String(Math.round(ms)), 'ms'];
+		if (ms < 60000) return [(ms / 1000).toFixed(1), 's'];
+		if (ms < 3600000) return [(ms / 60000).toFixed(1), 'min'];
+		return [(ms / 3600000).toFixed(1), 'hour'];
+	}
+	function pageLoadMs() {
+		try {
+			var nav = performance.getEntriesByType('navigation')[0];
+			if (nav && nav.duration > 0) return nav.duration;
+			var t = performance.timing;
+			if (t && t.loadEventEnd > t.navigationStart) return t.loadEventEnd - t.navigationStart;
+		} catch (e) {}
+		return -1;
+	}
+	function updateTime() {
+		var ms = pageLoadMs();
+		if (ms < 0) { labelMain.textContent = ''; labelSecondary.textContent = '-'; return; }
+		var parts = formatDuration(ms);
+		labelMain.textContent = parts[0];
+		labelSecondary.textContent = parts[1];
+	}
+	window.addEventListener('load', function () { setTimeout(updateTime, 0); });
+	updateTime();
 
 	bringUp();
 	render();
