@@ -1,3 +1,9 @@
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/dm-sans/700.css';
+import '@fontsource/dm-mono/400.css';
+import '@fontsource/dm-mono/500.css';
 import './style.css';
 
 import type {
@@ -44,7 +50,7 @@ import { bestSeoDescription, bestSeoImage, bestSeoTitle, missingSeoTags } from '
 import { isViewVisible, normalizeSettings, setHiddenView, type DevtoolsSettings } from './settings';
 import { timelineEvents, type TimelineEvent } from './timeline';
 import { icons, svelteLogo } from './shared/icons';
-import { railEntries } from './shared/view-context';
+import { railEntries, viewIcons } from './shared/view-context';
 
 type View =
 	| 'overview'
@@ -500,6 +506,8 @@ document.addEventListener('keydown', (event) => {
 const initialHash = location.hash.slice(1) as View;
 if (allViews.includes(initialHash) && isViewVisible(settings, initialHash)) {
 	view = initialHash;
+} else if (location.hash) {
+	history.replaceState(null, '', `#${view}`);
 }
 
 void refresh();
@@ -737,7 +745,10 @@ function render() {
 }
 
 function renderRail() {
-	if (!isViewVisible(settings, view)) view = 'overview';
+	if (!isViewVisible(settings, view)) {
+		view = 'overview';
+		history.replaceState(null, '', '#overview');
+	}
 
 	const tabs = railEntries
 		.filter((entry) => isViewVisible(settings, entry.view))
@@ -747,7 +758,7 @@ function renderRail() {
 					entry.view === view ? 'active' : ''
 				}" type="button" data-view="${escapeAttr(entry.view)}" title="${escapeAttr(
 					viewLabels[entry.view],
-				)}" aria-label="${escapeAttr(viewLabels[entry.view])}">${icons[entry.view] ?? ''}</button>`,
+				)}" aria-label="${escapeAttr(viewLabels[entry.view])}">${icons[viewIcons[entry.view]] ?? ''}</button>`,
 		)
 		.join('');
 
@@ -760,7 +771,7 @@ function renderRail() {
 			}" type="button" data-view="settings" title="Settings" aria-label="Settings">${icons.settings}</button>
 		</div>`;
 
-	viewTitleEl.innerHTML = `${icons[view] ?? ''}<h1>${escapeHtml(viewLabels[view])}</h1>`;
+	viewTitleEl.innerHTML = `${icons[viewIcons[view]] ?? ''}<h1>${escapeHtml(viewLabels[view])}</h1>`;
 }
 
 function renderOverview() {

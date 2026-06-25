@@ -33,6 +33,8 @@
 		"vite": ">=5.0.3"
 	},
 	"devDependencies": {
+		"@fontsource/dm-mono": "^5.2.5",
+		"@fontsource/dm-sans": "^5.2.5",
 		"@sveltejs/kit": "^2.68.0",
 		"@types/node": "^24.10.1",
 		"typescript": "^5.9.3",
