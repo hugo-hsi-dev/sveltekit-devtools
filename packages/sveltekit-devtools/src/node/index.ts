@@ -15,6 +15,7 @@ import { scanRouteActions } from './actions.js';
 import { scanAssets } from './assets.js';
 import { idleBuildAnalysis, runBuildAnalyze, scanBuildOutput } from './build-analyze.js';
 import { clientBridgeModuleCode } from './client-bridge.js';
+import { dockModuleCode } from './dock.js';
 import { scanComponents } from './components.js';
 import { isHookModule, scanHooks, transformHookModule } from './hooks.js';
 import { scanImports } from './imports.js';
@@ -50,6 +51,8 @@ const runtimeModuleId = 'virtual:sveltekit-devtools/runtime';
 const resolvedRuntimeModuleId = `\0${runtimeModuleId}`;
 const clientBridgeModuleId = 'virtual:sveltekit-devtools/client-bridge';
 const resolvedClientBridgeModuleId = `\0${clientBridgeModuleId}`;
+const dockModuleId = 'virtual:sveltekit-devtools/dock';
+const resolvedDockModuleId = `\0${dockModuleId}`;
 const clientDist = fileURLToPath(new URL('../client', import.meta.url));
 const svelteKitClientApp = '/.svelte-kit/generated/client/app.js';
 const require = createRequire(import.meta.url);
@@ -65,7 +68,7 @@ const svelteDockIcon = `data:image/svg+xml;base64,${Buffer.from(svelteLogoSvg).t
 
 export function sveltekitDevtools(options: SvelteKitDevtoolsOptions = {}): PluginOption {
 	return [
-		options.viteDevtools === false ? null : viteDevtoolsPlugin(),
+		options.viteDevtools === true ? viteDevtoolsPlugin() : null,
 		sveltekitDevtoolsPlugin(options),
 	];
 }
@@ -127,11 +130,13 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 		resolveId(id) {
 			if (id === runtimeModuleId) return resolvedRuntimeModuleId;
 			if (id === clientBridgeModuleId) return resolvedClientBridgeModuleId;
+			if (id === dockModuleId) return resolvedDockModuleId;
 			return null;
 		},
 		load(id) {
 			if (id === resolvedRuntimeModuleId) return runtimeModuleCode(maxLoadEvents);
 			if (id === resolvedClientBridgeModuleId) return clientBridgeModuleCode();
+			if (id === resolvedDockModuleId) return dockModuleCode(base);
 			return null;
 		},
 		transform(code, id) {
@@ -140,6 +145,8 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 				const imports = [`import(${JSON.stringify(clientBridgeModuleId)});`];
 				if (injectViteDevtools) {
 					imports.unshift(`import(${JSON.stringify(viteDevtoolsClientInject)});`);
+				} else {
+					imports.unshift(`import(${JSON.stringify(dockModuleId)});`);
 				}
 				return `${imports.join('\n')}\n${code}`;
 			}
