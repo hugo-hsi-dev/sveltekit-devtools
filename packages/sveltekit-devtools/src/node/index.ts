@@ -66,6 +66,33 @@ const svelteLogoSvg =
 	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 98 118"><path fill="#ff3e00" d="M91.8 15.6C80.9-.1 59.2-4.7 43.6 5.2L16.1 22.8C8.6 27.5 3.4 35.2 1.9 43.9c-1.3 7.3-.2 14.8 3.3 21.3-2.4 3.6-4 7.6-4.7 11.9-1.6 8.9.5 18 5.7 25.3 11 15.7 32.6 20.3 48.2 10.4l27.5-17.5c7.5-4.7 12.7-12.4 14.2-21.1 1.3-7.3.2-14.8-3.3-21.3 2.4-3.6 4-7.6 4.7-11.9 1.6-8.9-.4-18.1-5.7-25.4"/><path fill="#fff" d="M40.9 103.9c-8.9 2.3-18.2-1.2-23.4-8.7-3.2-4.4-4.4-9.9-3.5-15.3.2-.9.4-1.7.6-2.6l.5-1.6 1.4 1c3.3 2.4 6.9 4.2 10.8 5.4l1 .3-.1 1c-.1 1.4.3 2.9 1.1 4.1 1.6 2.3 4.4 3.3 7.1 2.6.6-.2 1.2-.4 1.7-.7L65.5 72c1.4-.9 2.3-2.2 2.6-3.8.3-1.6-.1-3.3-1-4.6-1.6-2.3-4.4-3.3-7.1-2.6-.6.2-1.2.4-1.7.7l-10.5 6.7c-1.7 1.1-3.6 1.9-5.6 2.4-8.9 2.3-18.2-1.2-23.4-8.7-3.1-4.4-4.4-9.9-3.4-15.3.9-5.2 4-9.8 8.5-12.7l27.5-17.5c1.7-1.1 3.6-1.9 5.6-2.5 8.9-2.3 18.2 1.2 23.4 8.7 3.2 4.4 4.4 9.9 3.5 15.3-.2.9-.4 1.7-.7 2.6l-.5 1.6-1.4-1c-3.3-2.4-6.9-4.2-10.8-5.4l-1-.3.1-1c.1-1.4-.3-2.9-1.1-4.1-1.6-2.3-4.4-3.3-7.1-2.5-.6.2-1.2.4-1.7.7L32.4 46c-1.4.9-2.3 2.2-2.6 3.8-.3 1.6.1 3.3 1 4.6 1.6 2.3 4.4 3.3 7.1 2.5.6-.2 1.2-.4 1.7-.7l10.5-6.7c1.7-1.1 3.6-1.9 5.6-2.5 8.9-2.3 18.2 1.2 23.4 8.7 3.2 4.4 4.4 9.9 3.5 15.3-.9 5.2-4 9.8-8.5 12.7l-27.5 17.5c-1.7 1.1-3.6 1.9-5.6 2.5"/></svg>';
 const svelteDockIcon = `data:image/svg+xml;base64,${Buffer.from(svelteLogoSvg).toString('base64')}`;
 
+// Editor ids accepted for open-in-editor; launch-editor spawns this as a command,
+// so the request-supplied value must be allowlisted (otherwise auto-detect).
+const editorAllowlist = new Set([
+	'code',
+	'code-insiders',
+	'codium',
+	'vscodium',
+	'cursor',
+	'windsurf',
+	'zed',
+	'webstorm',
+	'idea',
+	'phpstorm',
+	'pycharm',
+	'rubymine',
+	'goland',
+	'clion',
+	'rider',
+	'fleet',
+	'subl',
+	'sublime',
+	'atom',
+	'emacs',
+	'vim',
+	'nvim',
+]);
+
 export function sveltekitDevtools(options: SvelteKitDevtoolsOptions = {}): PluginOption {
 	return [
 		options.viteDevtools === true ? viteDevtoolsPlugin() : null,
@@ -239,11 +266,13 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 						const body = JSON.parse(await readBody(req)) as { name?: string };
 						const result = await runTask({ root: config.root, name: body.name ?? '' });
 						taskRuns = [result, ...taskRuns].slice(0, maxLoadEvents);
+						notifyClients();
 						return writeJson(res, result.status === 'success' ? 200 : 400, result);
 					}
 
 					if (url.pathname === `${base}api/clear` && req.method === 'POST') {
 						clearLoadEvents();
+						notifyClients();
 						return writeJson(res, 200, { ok: true });
 					}
 
@@ -267,13 +296,17 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 						};
 						const file = body.file ?? '';
 						if (!file) return writeJson(res, 400, { ok: false, error: 'missing file' });
-						const abs = path.isAbsolute(file) ? file : path.resolve(config.root, file);
+						const abs = path.resolve(config.root, file);
+						const rel = path.relative(config.root, abs);
+						if (rel.startsWith('..') || path.isAbsolute(rel)) {
+							return writeJson(res, 400, { ok: false, error: 'file outside project root' });
+						}
+						// launch-editor spawns the 2nd arg as a command, so only allow known ids.
+						const editor =
+							body.editor && editorAllowlist.has(body.editor) ? body.editor : undefined;
 						try {
 							const { default: launchEditor } = await import('launch-editor');
-							launchEditor(
-								`${abs}:${body.line ?? 1}:${body.column ?? 1}`,
-								body.editor || undefined,
-							);
+							launchEditor(`${abs}:${body.line ?? 1}:${body.column ?? 1}`, editor);
 							return writeJson(res, 200, { ok: true });
 						} catch (error) {
 							return writeJson(res, 500, {
@@ -319,6 +352,7 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 						setup: () => ({
 							handler: async () => {
 								clearLoadEvents();
+								notifyClients();
 								return { ok: true };
 							},
 						}),
