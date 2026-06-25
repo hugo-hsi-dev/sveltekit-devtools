@@ -72,6 +72,7 @@ const dockCss = `
 	padding: 2px 0;
 }
 .sk-icon-button {
+	flex: none;
 	border-radius: 100%;
 	width: 30px;
 	height: 30px;
