@@ -2,9 +2,9 @@
 	color-scheme: dark;
 
 	/* Nuxt DevTools design tokens */
-	--nui-brand: #00dc82;
-	--nui-primary: #099e61;
-	--nui-c-context: 9, 158, 97;
+	--nui-brand: #ff8a00;
+	--nui-primary: #ff3e00;
+	--nui-c-context: 255, 62, 0;
 	--nui-context: rgba(var(--nui-c-context), 1);
 
 	--nui-bg-base: #151515;

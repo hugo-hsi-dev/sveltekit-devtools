@@ -35,6 +35,7 @@
 	"devDependencies": {
 		"@fontsource/dm-mono": "^5.2.5",
 		"@fontsource/dm-sans": "^5.2.5",
+		"@phosphor-icons/core": "^2.1.1",
 		"@sveltejs/kit": "^2.68.0",
 		"@types/node": "^24.10.1",
 		"typescript": "^5.9.3",
