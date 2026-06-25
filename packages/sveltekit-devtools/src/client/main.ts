@@ -559,9 +559,24 @@ if (allViews.includes(initialHash) && isViewVisible(settings, initialHash)) {
 }
 
 void refresh();
+
+// Live push: refresh near-instantly when the server reports new runtime events,
+// with a slower poll as a fallback (covers file-scan changes SSE doesn't push).
+let sseRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+try {
+	const events = new EventSource('/__sveltekit-devtools/api/events');
+	events.onmessage = () => {
+		if (document.hidden || Date.now() <= pauseAutoRefreshUntil) return;
+		clearTimeout(sseRefreshTimer);
+		sseRefreshTimer = setTimeout(() => void refresh(false), 120);
+	};
+} catch {
+	// EventSource unavailable — the poll below still keeps state fresh
+}
+
 setInterval(() => {
 	if (!document.hidden && Date.now() > pauseAutoRefreshUntil) void refresh(false);
-}, 1800);
+}, 4000);
 
 async function refresh(showLoading = true) {
 	if (showLoading) setStatus('Loading', '');

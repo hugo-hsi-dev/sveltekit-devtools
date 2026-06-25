@@ -86,6 +86,17 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 	let buildAnalysisPromise: Promise<DevtoolsState['buildAnalysis']> | null = null;
 	let devServer: ViteDevServer | null = null;
 	let taskRuns: DevtoolsState['taskRuns'] = [];
+	const sseClients = new Set<ServerResponse>();
+
+	function notifyClients() {
+		for (const client of sseClients) {
+			try {
+				client.write('data: update\n\n');
+			} catch {
+				sseClients.delete(client);
+			}
+		}
+	}
 
 	async function readState(): Promise<DevtoolsState> {
 		return {
@@ -171,13 +182,27 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 						return writeJson(res, 200, await readState());
 					}
 
+					if (url.pathname === `${base}api/events`) {
+						res.writeHead(200, {
+							'content-type': 'text/event-stream',
+							'cache-control': 'no-cache',
+							connection: 'keep-alive',
+						});
+						res.write('retry: 2000\n\n');
+						sseClients.add(res);
+						req.on('close', () => sseClients.delete(res));
+						return;
+					}
+
 					if (url.pathname === `${base}api/load` && req.method === 'POST') {
 						addLoadEvent(JSON.parse(await readBody(req)) as LoadEvent, maxLoadEvents);
+						notifyClients();
 						return writeJson(res, 200, { ok: true });
 					}
 
 					if (url.pathname === `${base}api/remote-call` && req.method === 'POST') {
 						addRemoteCallEvent(JSON.parse(await readBody(req)) as RemoteCallEvent, maxLoadEvents);
+						notifyClients();
 						return writeJson(res, 200, { ok: true });
 					}
 
@@ -186,6 +211,7 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 							JSON.parse(await readBody(req)) as DevtoolsState['hookEvents'][number],
 							maxLoadEvents,
 						);
+						notifyClients();
 						return writeJson(res, 200, { ok: true });
 					}
 
