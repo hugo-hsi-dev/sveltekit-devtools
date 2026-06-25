@@ -13,12 +13,8 @@ export const icons: Record<string, string> = {
 	),
 	loads: svg('<path d="M10 2.5v9M6 8l4 4 4-4M3.5 16.5h13"/>'),
 	timeline: svg('<path d="M2 10h3l2-6 3 12 2.5-7 1.5 3H18"/>'),
-	hooks: svg(
-		'<path d="M7.5 2.5v4M12.5 2.5v4M6 6.5h8v3a4 4 0 0 1-4 4 4 4 0 0 1-4-4zM10 13.5v4"/>',
-	),
-	imports: svg(
-		'<path d="M3 6.5 10 3l7 3.5M3 6.5 10 10l7-3.5M3 6.5v7L10 17l7-3.5v-7M10 10v7"/>',
-	),
+	hooks: svg('<path d="M7.5 2.5v4M12.5 2.5v4M6 6.5h8v3a4 4 0 0 1-4 4 4 4 0 0 1-4-4zM10 13.5v4"/>'),
+	imports: svg('<path d="M3 6.5 10 3l7 3.5M3 6.5 10 10l7-3.5M3 6.5v7L10 17l7-3.5v-7M10 10v7"/>'),
 	plugins: svg(
 		'<path d="M8 2.5h2.5a1.5 1.5 0 0 1 0 3H8v3H5a1.5 1.5 0 0 0 0 3h0v3.5h3.5v0a1.5 1.5 0 0 0 3 0h0V14.5H15a1.5 1.5 0 0 0 0-3v0H11.5V8.5H15v-3H11.5"/>',
 	),
@@ -27,7 +23,9 @@ export const icons: Record<string, string> = {
 	),
 	'build-analyze': svg('<path d="M3 17V8M8 17V3M13 17v-6M17 17H2"/>'),
 	inspect: svg('<circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5 17 17"/>'),
-	tasks: svg('<rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><path d="M5.5 8l2.5 2-2.5 2M10 12.5h4"/>'),
+	tasks: svg(
+		'<rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><path d="M5.5 8l2.5 2-2.5 2M10 12.5h4"/>',
+	),
 	'open-graph': svg(
 		'<rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><circle cx="7" cy="8" r="1.5"/><path d="M3 14l4-3.5 3 2.5 3-3 4 4"/>',
 	),
@@ -52,7 +50,9 @@ export const icons: Record<string, string> = {
 	'open-file': svg('<path d="M3 4.5h5l1.5 2H17v9H3z"/>'),
 	'external-link': svg('<path d="M8 4H4v12h12v-4M12 3h5v5M17 3l-7 7"/>'),
 	play: svg('<path d="M6 4l9 6-9 6Z"/>'),
-	refresh: svg('<path d="M16 4.5v3.5h-3.5M4 15.5V12h3.5"/><path d="M4.5 8a6 6 0 0 1 10.5-2.5M15.5 12a6 6 0 0 1-10.5 2.5"/>'),
+	refresh: svg(
+		'<path d="M16 4.5v3.5h-3.5M4 15.5V12h3.5"/><path d="M4.5 8a6 6 0 0 1 10.5-2.5M15.5 12a6 6 0 0 1-10.5 2.5"/>',
+	),
 	check: svg('<path d="M4 10.5l4 4 8-9"/>'),
 	warning: svg('<path d="M10 3 18 16H2Z M10 8v4M10 14.5h.01"/>'),
 };
