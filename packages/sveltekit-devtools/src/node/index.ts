@@ -226,13 +226,17 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 							file?: string;
 							line?: number;
 							column?: number;
+							editor?: string;
 						};
 						const file = body.file ?? '';
 						if (!file) return writeJson(res, 400, { ok: false, error: 'missing file' });
 						const abs = path.isAbsolute(file) ? file : path.resolve(config.root, file);
 						try {
 							const { default: launchEditor } = await import('launch-editor');
-							launchEditor(`${abs}:${body.line ?? 1}:${body.column ?? 1}`);
+							launchEditor(
+								`${abs}:${body.line ?? 1}:${body.column ?? 1}`,
+								body.editor || undefined,
+							);
 							return writeJson(res, 200, { ok: true });
 						} catch (error) {
 							return writeJson(res, 500, {

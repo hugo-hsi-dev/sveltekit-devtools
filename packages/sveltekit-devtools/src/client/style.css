@@ -468,6 +468,19 @@ h3 {
 	border-color: rgba(var(--nui-c-context), 0.3);
 }
 
+.timeline-controls {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.timeline-controls select,
+.timeline-controls button {
+	padding: 4px 10px;
+	min-height: 30px;
+}
+
 .route-dot {
 	display: inline-block;
 	width: 7px;

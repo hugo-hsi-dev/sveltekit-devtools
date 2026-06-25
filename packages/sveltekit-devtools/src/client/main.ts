@@ -230,6 +230,7 @@ let seoError = '';
 let settings = loadSettings();
 let paletteOpen = false;
 let paletteQuery = '';
+let hostTheme: 'dark' | 'light' | null = null;
 
 applySettings();
 element('#open-command-palette').addEventListener('click', () => openPalette());
@@ -249,6 +250,21 @@ document.addEventListener('click', (event) => {
 	if (tab) {
 		pauseAutoRefresh();
 		setView(tab.dataset.view as View);
+		return;
+	}
+
+	if ((event.target as Element | null)?.closest('button[data-reset-settings]')) {
+		settings = normalizeSettings(null, configurableViews);
+		saveSettings();
+		render();
+		return;
+	}
+
+	if ((event.target as Element | null)?.closest('button[data-timeline-record]')) {
+		timelineRecording = !timelineRecording;
+		timelineSnapshot = timelineRecording ? null : timelineEvents(state);
+		pauseAutoRefresh();
+		renderTimeline();
 		return;
 	}
 
@@ -488,6 +504,25 @@ document.addEventListener('change', (event) => {
 		return;
 	}
 
+	const settingEditor = (event.target as Element | null)?.closest<HTMLInputElement>(
+		'input[data-setting-editor]',
+	);
+	if (settingEditor) {
+		settings = normalizeSettings({ ...settings, editor: settingEditor.value }, configurableViews);
+		saveSettings();
+		return;
+	}
+
+	const timelineKindSel = (event.target as Element | null)?.closest<HTMLSelectElement>(
+		'select[data-timeline-kind]',
+	);
+	if (timelineKindSel) {
+		timelineKind = timelineKindSel.value;
+		pauseAutoRefresh();
+		renderTimeline();
+		return;
+	}
+
 	const method = (event.target as Element | null)?.closest<HTMLSelectElement>(
 		'select[data-server-route-method]',
 	);
@@ -586,8 +621,6 @@ function saveSettings() {
 	applySettings();
 }
 
-let hostTheme: 'dark' | 'light' | null = null;
-
 function resolvedTheme(): 'dark' | 'light' {
 	if (settings.theme === 'dark' || settings.theme === 'light') return settings.theme;
 	if (hostTheme) return hostTheme;
@@ -681,6 +714,18 @@ window.addEventListener('message', (event) => {
 		renderRoutesList();
 	}
 });
+
+// Fill in natural image dimensions on asset cards once each preview loads.
+assetsViewEl.addEventListener(
+	'load',
+	(event) => {
+		const img = event.target;
+		if (!(img instanceof HTMLImageElement) || !img.closest('.asset-preview')) return;
+		const dim = img.closest('.result-card')?.querySelector('[data-asset-dim]');
+		if (dim && img.naturalWidth) dim.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+	},
+	true,
+);
 
 function routeMatchesCurrent(routePath: string): boolean {
 	if (!currentRoute) return false;
@@ -1168,20 +1213,40 @@ function renderLoads() {
 	</div>`;
 }
 
+let timelineKind = 'all';
+let timelineRecording = true;
+let timelineSnapshot: TimelineEvent[] | null = null;
+
 function renderTimeline() {
-	const events = timelineEvents(state);
+	const source = timelineRecording ? timelineEvents(state) : (timelineSnapshot ?? []);
+	const kinds = [...new Set(source.map((event) => event.kind))];
+	if (timelineKind !== 'all' && !kinds.includes(timelineKind)) timelineKind = 'all';
+	const events =
+		timelineKind === 'all' ? source : source.filter((event) => event.kind === timelineKind);
 	const max = Math.max(1, ...events.map((event) => event.duration));
 	timelineViewEl.innerHTML = `<div class="section-head">
 		<div>
 			<h2>Timeline</h2>
 			<p class="muted">Runtime load, hook, and remote calls in one stream.</p>
 		</div>
-		<span class="badge">${events.length} events</span>
+		<div class="timeline-controls">
+			<select data-timeline-kind aria-label="Filter by kind">
+				<option value="all" ${timelineKind === 'all' ? 'selected' : ''}>All kinds</option>
+				${kinds
+					.map(
+						(kind) =>
+							`<option value="${escapeAttr(kind)}" ${timelineKind === kind ? 'selected' : ''}>${escapeHtml(kind)}</option>`,
+					)
+					.join('')}
+			</select>
+			<button type="button" data-timeline-record>${timelineRecording ? '❙❙ Pause' : '● Record'}</button>
+			<span class="badge">${events.length} events</span>
+		</div>
 	</div>
 	<div class="load-list">
 		${
 			events.map((event) => renderTimelineRow(event, max)).join('') ||
-			`<div class="empty">Visit routes or run remote calls to collect events</div>`
+			`<div class="empty">${timelineRecording ? 'Visit routes or run remote calls to collect events' : 'Recording paused'}</div>`
 		}
 	</div>`;
 }
@@ -1609,6 +1674,16 @@ function renderSettings() {
 					<input type="checkbox" data-setting-compact ${settings.compact ? 'checked' : ''} />
 					<span>Compact density</span>
 				</label>
+				<label>
+					<span class="muted">Editor (blank = auto-detect)</span>
+					<input
+						type="text"
+						data-setting-editor
+						value="${escapeAttr(settings.editor)}"
+						placeholder="code, cursor, webstorm…"
+					/>
+				</label>
+				<button type="button" data-reset-settings>Reset settings</button>
 			</div>
 		</article>
 		<article class="result-card">
@@ -2478,6 +2553,11 @@ function renderAssetCard(asset: AssetInfo) {
 		</div>
 		<div class="meta-list">
 			${renderMetaRow('Type', asset.type)}
+			${
+				asset.preview === 'image'
+					? `<div class="meta-row"><span>Dimensions</span><strong data-asset-dim>…</strong></div>`
+					: ''
+			}
 			${renderMetaRow('Updated', new Date(asset.mtime).toLocaleString())}
 		</div>
 	</article>`;
@@ -2644,7 +2724,7 @@ async function openSourceFile(file: string, line?: number, column?: number) {
 		const response = await fetch('/__sveltekit-devtools/api/open-in-editor', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ file: target, line, column }),
+			body: JSON.stringify({ file: target, line, column, editor: settings.editor || undefined }),
 		});
 		if (!response.ok) throw new Error('Open in editor failed');
 		setStatus('Opened file', 'live');

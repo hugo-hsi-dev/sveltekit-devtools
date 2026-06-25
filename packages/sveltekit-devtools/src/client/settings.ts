@@ -3,6 +3,7 @@ export interface DevtoolsSettings {
 	scale: '90' | '100' | '110';
 	compact: boolean;
 	theme: 'auto' | 'dark' | 'light';
+	editor: string;
 }
 
 export const defaultDevtoolsSettings: DevtoolsSettings = {
@@ -10,6 +11,7 @@ export const defaultDevtoolsSettings: DevtoolsSettings = {
 	scale: '100',
 	compact: false,
 	theme: 'auto',
+	editor: '',
 };
 
 const scales = new Set<DevtoolsSettings['scale']>(['90', '100', '110']);
@@ -36,6 +38,7 @@ export function normalizeSettings(
 		scale,
 		compact: Boolean(value?.compact),
 		theme,
+		editor: typeof value?.editor === 'string' ? value.editor.slice(0, 64) : '',
 	};
 }
 
