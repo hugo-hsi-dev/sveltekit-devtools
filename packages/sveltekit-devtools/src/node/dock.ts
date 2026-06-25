@@ -526,6 +526,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 	anchor.addEventListener('mousemove', bringUp);
 	window.addEventListener('resize', render);
 	window.addEventListener('keydown', function (e) {
+		var t = e.target;
+		if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
 		if (e.shiftKey && e.altKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')) {
 			e.preventDefault();
 			toggleOpen();

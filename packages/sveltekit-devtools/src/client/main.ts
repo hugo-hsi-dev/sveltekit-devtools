@@ -233,6 +233,9 @@ let paletteQuery = '';
 let hostTheme: 'dark' | 'light' | null = null;
 
 applySettings();
+window.matchMedia?.('(prefers-color-scheme: light)')?.addEventListener?.('change', () => {
+	if (settings.theme === 'auto') applySettings();
+});
 element('#open-command-palette').addEventListener('click', () => openPalette());
 element('#refresh').addEventListener('click', () => refresh());
 element('#clear-loads').addEventListener('click', async () => {
@@ -683,14 +686,29 @@ function enhanceSections() {
 			if (!key) return;
 			section.classList.add('collapsible-section');
 			head.dataset.sectionKey = key;
+			head.tabIndex = 0;
+			head.setAttribute('role', 'button');
 			if (!head.querySelector('.section-chevron')) {
 				const chevron = document.createElement('span');
 				chevron.className = 'section-chevron';
 				chevron.innerHTML = sectionChevron;
 				head.appendChild(chevron);
 			}
-			section.classList.toggle('collapsed', collapsedSections.has(key));
+			const collapsed = collapsedSections.has(key);
+			section.classList.toggle('collapsed', collapsed);
+			head.setAttribute('aria-expanded', String(!collapsed));
 		});
+}
+
+function toggleSection(head: HTMLElement) {
+	const section = head.parentElement;
+	if (!head.dataset.sectionKey || !section) return;
+	const collapsed = !section.classList.contains('collapsed');
+	section.classList.toggle('collapsed', collapsed);
+	head.setAttribute('aria-expanded', String(!collapsed));
+	if (collapsed) collapsedSections.add(head.dataset.sectionKey);
+	else collapsedSections.delete(head.dataset.sectionKey);
+	saveCollapsedSections();
 }
 
 function animateActiveView() {
@@ -705,12 +723,17 @@ document.addEventListener('click', (event) => {
 	const head = (event.target as Element | null)?.closest<HTMLElement>(
 		'.collapsible-section > .section-head.compact',
 	);
-	if (!head?.dataset.sectionKey || !head.parentElement) return;
-	const collapsed = !head.parentElement.classList.contains('collapsed');
-	head.parentElement.classList.toggle('collapsed', collapsed);
-	if (collapsed) collapsedSections.add(head.dataset.sectionKey);
-	else collapsedSections.delete(head.dataset.sectionKey);
-	saveCollapsedSections();
+	if (head) toggleSection(head);
+});
+
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Enter' && event.key !== ' ') return;
+	const head = (event.target as Element | null)?.closest<HTMLElement>(
+		'.collapsible-section > .section-head.compact',
+	);
+	if (!head) return;
+	event.preventDefault();
+	toggleSection(head);
 });
 
 // State pushed from the host page via the injected dock (theme + current route).
@@ -745,15 +768,25 @@ assetsViewEl.addEventListener(
 function routeMatchesCurrent(routePath: string): boolean {
 	if (!currentRoute) return false;
 	const pathname = currentRoute.split('?')[0];
+	// route.path is normalized by routePathFromId(): :param, :param? (optional),
+	// *rest, and params embedded in a segment (e.g. foo-:id). Build a matcher.
 	const pattern = routePath
 		.split('/')
 		.map((seg) => {
-			if (/^\[\.\.\..+\]$/.test(seg)) return '.*';
-			if (/^\[\[.+\]\]$/.test(seg)) return '[^/]*';
-			if (/^\[.+\]$/.test(seg)) return '[^/]+';
-			return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			if (/^\*[\w$]+$/.test(seg)) return '__REST__';
+			if (/^:[\w$]+\?$/.test(seg)) return '__OPT__';
+			return seg
+				.replace(/:[\w$]+\??/g, ' P ')
+				.replace(/\*[\w$]+/g, ' R ')
+				.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+				.replace(/ P /g, '[^/]+')
+				.replace(/ R /g, '[^/]*');
 		})
-		.join('/');
+		.join('/')
+		.replace(/\/__REST__/g, '(?:/.*)?')
+		.replace(/\/__OPT__/g, '(?:/[^/]+)?')
+		.replace(/__REST__/g, '.*')
+		.replace(/__OPT__/g, '[^/]*');
 	try {
 		return new RegExp(`^${pattern}/?$`).test(pathname);
 	} catch {
@@ -1041,8 +1074,8 @@ function renderRoutesList() {
 				const isCurrent = routeMatchesCurrent(route.path);
 				return `<button class="route-row ${route.id === selectedRoute ? 'active' : ''} ${
 					isCurrent ? 'current' : ''
-				}" type="button" data-route="${escapeAttr(route.id)}">
-				<span class="route-path">${isCurrent ? '<span class="route-dot" title="Current page"></span>' : ''}${escapeHtml(route.path)}</span>
+				}" type="button" data-route="${escapeAttr(route.id)}"${isCurrent ? ' aria-current="page"' : ''}>
+				<span class="route-path">${isCurrent ? '<span class="route-dot" title="Current page" aria-hidden="true"></span>' : ''}${escapeHtml(route.path)}</span>
 				<span class="badge ${latest ? 'hot' : ''}">${latest ? `${latest.duration} ms` : route.files.length}</span>
 			</button>`;
 			})
@@ -2727,10 +2760,11 @@ function routeParamValues(route: SvelteKitRoute) {
 async function openSourceFile(file: string, line?: number, column?: number) {
 	if (!file) return;
 	const target = file.startsWith('/') ? file : `${state.root}/${file}`;
+	const positioned = line ? `${target}:${line}${column ? `:${column}` : ''}` : target;
 
 	const rpc = await rpcClient();
 	if (rpc) {
-		await rpc.call('vite:core:open-in-editor', target);
+		await rpc.call('vite:core:open-in-editor', positioned);
 		setStatus('Opened file', 'live');
 		return;
 	}

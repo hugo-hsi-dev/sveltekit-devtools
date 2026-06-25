@@ -248,6 +248,17 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 					}
 
 					if (url.pathname === `${base}api/open-in-editor` && req.method === 'POST') {
+						const fetchSite = req.headers['sec-fetch-site'];
+						if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') {
+							return writeJson(res, 403, { ok: false, error: 'forbidden' });
+						}
+						const reqOrigin = req.headers.origin;
+						if (reqOrigin && req.headers.host && new URL(reqOrigin).host !== req.headers.host) {
+							return writeJson(res, 403, { ok: false, error: 'forbidden' });
+						}
+						if (!String(req.headers['content-type'] ?? '').includes('application/json')) {
+							return writeJson(res, 415, { ok: false, error: 'expected application/json' });
+						}
 						const body = JSON.parse(await readBody(req)) as {
 							file?: string;
 							line?: number;
