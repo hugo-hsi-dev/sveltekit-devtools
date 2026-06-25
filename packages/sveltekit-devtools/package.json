@@ -25,7 +25,8 @@
 	},
 	"dependencies": {
 		"@vitejs/devtools": "^0.3.3",
-		"@vitejs/devtools-kit": "^0.3.3"
+		"@vitejs/devtools-kit": "^0.3.3",
+		"launch-editor": "^2.14.1"
 	},
 	"peerDependencies": {
 		"@sveltejs/kit": ">=2.0.0",

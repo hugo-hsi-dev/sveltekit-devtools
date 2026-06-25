@@ -75,6 +75,12 @@ const dockCss = `
 	max-width: 32px;
 	padding: 2px 0;
 }
+.sk-anchor.dragging .sk-panel {
+	transition: none;
+}
+.sk-anchor.vertical .sk-panel {
+	box-shadow: 2px -2px 8px var(--shadow);
+}
 .sk-icon-button {
 	flex: none;
 	border-radius: 100%;
@@ -355,6 +361,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 
 		anchor.classList.toggle('vertical', isVertical);
 		anchor.classList.toggle('hide', minimized);
+		anchor.classList.toggle('dragging', dragging);
 
 		var slide = '+ 0px';
 		if (minimized) {
@@ -367,7 +374,16 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 			panel.style.transform = 'translate(-50%, calc(-50% ' + slide + '))';
 		}
 
+		// Flatten the pill corners that meet the screen edge when minimized.
+		var flatTop = minimized && (pos === 'top' || pos === 'right');
+		var flatBottom = minimized && (pos === 'bottom' || pos === 'left');
+		panel.style.borderTopLeftRadius = flatTop ? '0' : '';
+		panel.style.borderTopRightRadius = flatTop ? '0' : '';
+		panel.style.borderBottomLeftRadius = flatBottom ? '0' : '';
+		panel.style.borderBottomRightRadius = flatBottom ? '0' : '';
+
 		toggleBtn.style.filter = state.open ? '' : 'saturate(0)';
+		glow.style.opacity = dragging ? '0.6' : '';
 		renderFrame();
 	}
 
@@ -473,6 +489,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 
 	anchor.addEventListener('mousemove', bringUp);
 	window.addEventListener('resize', render);
+	window.addEventListener('keydown', function (e) {
+		if (e.shiftKey && e.altKey && (e.code === 'KeyD' || e.key === 'D' || e.key === 'd')) {
+			e.preventDefault();
+			toggleOpen();
+		}
+	});
 
 	function formatDuration(ms) {
 		if (ms < 1000) return [String(Math.round(ms)), 'ms'];

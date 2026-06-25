@@ -2492,17 +2492,28 @@ function routeParamValues(route: SvelteKitRoute) {
 	return routeParamInputs[route.id];
 }
 
-async function openSourceFile(file: string) {
+async function openSourceFile(file: string, line?: number, column?: number) {
 	if (!file) return;
+	const target = file.startsWith('/') ? file : `${state.root}/${file}`;
 
 	const rpc = await rpcClient();
-	if (!rpc) {
-		setStatus('Open file needs dock', 'error');
+	if (rpc) {
+		await rpc.call('vite:core:open-in-editor', target);
+		setStatus('Opened file', 'live');
 		return;
 	}
 
-	await rpc.call('vite:core:open-in-editor', file.startsWith('/') ? file : `${state.root}/${file}`);
-	setStatus('Opened file', 'live');
+	try {
+		const response = await fetch('/__sveltekit-devtools/api/open-in-editor', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ file: target, line, column }),
+		});
+		if (!response.ok) throw new Error('Open in editor failed');
+		setStatus('Opened file', 'live');
+	} catch {
+		setStatus('Open file failed', 'error');
+	}
 }
 
 function openRoute(path: string) {
