@@ -27,6 +27,7 @@
 	--nui-radius-lg: 12px;
 	--nui-radius-full: 9999px;
 	--nui-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+	--nui-glass: rgba(21, 21, 21, 0.9);
 	--nui-transition: all 200ms ease;
 
 	--nui-font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -38,6 +39,69 @@
 	font-family: var(--nui-font-sans);
 	background: var(--nui-bg-base);
 	color: var(--nui-text);
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+	--nui-bg-base: #ffffff;
+	--nui-bg-elevated: #f7f7f8;
+	--nui-code-bg: #f3f4f6;
+	--nui-bg-active: rgba(0, 0, 0, 0.05);
+	--nui-bg-hover: rgba(0, 0, 0, 0.03);
+	--nui-border: rgba(0, 0, 0, 0.12);
+	--nui-border-strong: rgba(0, 0, 0, 0.22);
+	--nui-text: rgba(0, 0, 0, 0.85);
+	--nui-text-secondary: rgba(0, 0, 0, 0.55);
+	--nui-text-muted: rgba(0, 0, 0, 0.4);
+	--nui-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.08);
+	--nui-glass: rgba(255, 255, 255, 0.85);
+}
+
+:root[data-theme='light'] .n-panel-grids {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='100%25' height='100%25' fill='hsl(0,0%25,99%25)'/%3E%3Cpath d='M20 0V40M0 20H40' stroke='hsl(0,0%25,92%25)' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");
+}
+
+/* View-switch enter transition (fired only on explicit nav, not auto-refresh) */
+@keyframes view-enter {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+.view.view-enter {
+	animation: view-enter 200ms ease;
+}
+
+/* Collapsible sub-sections (native-feel, chevron rotates; state persisted) */
+.collapsible-section > .section-head.compact {
+	cursor: pointer;
+	user-select: none;
+	justify-content: flex-start;
+	gap: 10px;
+}
+.collapsible-section > .section-head.compact > :first-child {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.section-chevron {
+	display: inline-flex;
+	flex: none;
+	color: var(--nui-text-secondary);
+	transition: transform 200ms ease;
+}
+.section-chevron svg {
+	width: 16px;
+	height: 16px;
+}
+.collapsible-section.collapsed > .section-head.compact .section-chevron {
+	transform: rotate(-90deg);
+}
+.collapsible-section.collapsed > :not(.section-head) {
+	display: none;
 }
 
 html,
@@ -249,7 +313,7 @@ h3 {
 	justify-content: space-between;
 	gap: 16px;
 	padding: 12px 18px;
-	background: rgba(21, 21, 21, 0.9);
+	background: var(--nui-glass);
 	backdrop-filter: blur(6px);
 	border-bottom: 1px solid var(--nui-border);
 }
@@ -844,7 +908,7 @@ h3 {
 	width: min(680px, 100%);
 	border: 1px solid var(--nui-border-strong);
 	border-radius: var(--nui-radius-lg);
-	background: rgba(21, 21, 21, 0.92);
+	background: var(--nui-glass);
 	backdrop-filter: blur(6px);
 	box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 	overflow: hidden;

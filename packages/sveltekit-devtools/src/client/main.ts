@@ -475,6 +475,19 @@ document.addEventListener('change', (event) => {
 		return;
 	}
 
+	const settingTheme = (event.target as Element | null)?.closest<HTMLSelectElement>(
+		'select[data-setting-theme]',
+	);
+	if (settingTheme) {
+		settings = normalizeSettings(
+			{ ...settings, theme: settingTheme.value as DevtoolsSettings['theme'] },
+			configurableViews,
+		);
+		saveSettings();
+		render();
+		return;
+	}
+
 	const method = (event.target as Element | null)?.closest<HTMLSelectElement>(
 		'select[data-server-route-method]',
 	);
@@ -573,16 +586,91 @@ function saveSettings() {
 	applySettings();
 }
 
+let hostTheme: 'dark' | 'light' | null = null;
+
+function resolvedTheme(): 'dark' | 'light' {
+	if (settings.theme === 'dark' || settings.theme === 'light') return settings.theme;
+	if (hostTheme) return hostTheme;
+	return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
 function applySettings() {
 	document.documentElement.style.setProperty('--devtools-font-size', `${settings.scale}%`);
 	document.body.dataset.density = settings.compact ? 'compact' : 'comfortable';
+	document.documentElement.dataset.theme = resolvedTheme();
 }
+
+const collapsedKey = 'sveltekit-devtools:collapsed';
+const sectionChevron =
+	'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4" /></svg>';
+let collapsedSections = loadCollapsedSections();
+
+function loadCollapsedSections(): Set<string> {
+	try {
+		return new Set(JSON.parse(localStorage.getItem(collapsedKey) ?? '[]') as string[]);
+	} catch {
+		return new Set();
+	}
+}
+
+function saveCollapsedSections() {
+	try {
+		localStorage.setItem(collapsedKey, JSON.stringify([...collapsedSections]));
+	} catch {
+		// ignore storage failures
+	}
+}
+
+// Make the recurring sub-sections collapsible (native-feel) without rewriting
+// every render function: add a chevron + a stable key, restore collapse state.
+function enhanceSections() {
+	document
+		.querySelectorAll<HTMLElement>(
+			'section.remote-calls > .section-head.compact, section.route-components > .section-head.compact',
+		)
+		.forEach((head) => {
+			const section = head.parentElement;
+			if (!section) return;
+			const key = head.querySelector('h3')?.textContent?.trim() ?? '';
+			if (!key) return;
+			section.classList.add('collapsible-section');
+			head.dataset.sectionKey = key;
+			if (!head.querySelector('.section-chevron')) {
+				const chevron = document.createElement('span');
+				chevron.className = 'section-chevron';
+				chevron.innerHTML = sectionChevron;
+				head.appendChild(chevron);
+			}
+			section.classList.toggle('collapsed', collapsedSections.has(key));
+		});
+}
+
+function animateActiveView() {
+	const el = document.querySelector<HTMLElement>('.panel .view:not(.hidden)');
+	if (!el) return;
+	el.classList.remove('view-enter');
+	void el.offsetWidth;
+	el.classList.add('view-enter');
+}
+
+document.addEventListener('click', (event) => {
+	const head = (event.target as Element | null)?.closest<HTMLElement>(
+		'.collapsible-section > .section-head.compact',
+	);
+	if (!head?.dataset.sectionKey || !head.parentElement) return;
+	const collapsed = !head.parentElement.classList.contains('collapsed');
+	head.parentElement.classList.toggle('collapsed', collapsed);
+	if (collapsed) collapsedSections.add(head.dataset.sectionKey);
+	else collapsedSections.delete(head.dataset.sectionKey);
+	saveCollapsedSections();
+});
 
 function setView(next: View) {
 	if (!isViewVisible(settings, next)) return;
 	view = next;
 	history.replaceState(null, '', `#${next}`);
 	render();
+	animateActiveView();
 	if (view === 'open-graph') void requestSeoMeta();
 }
 
@@ -742,6 +830,7 @@ function render() {
 	renderVirtualFiles();
 	renderSettings();
 	renderPalette();
+	enhanceSections();
 }
 
 function renderRail() {
@@ -1457,6 +1546,17 @@ function renderSettings() {
 		<article class="result-card">
 			<h3>Interface</h3>
 			<div class="tester">
+				<label>
+					<span class="muted">Theme</span>
+					<select data-setting-theme>
+						${(['auto', 'dark', 'light'] as const)
+							.map(
+								(theme) =>
+									`<option value="${theme}" ${settings.theme === theme ? 'selected' : ''}>${theme[0].toUpperCase()}${theme.slice(1)}</option>`,
+							)
+							.join('')}
+					</select>
+				</label>
 				<label>
 					<span class="muted">Scale</span>
 					<select data-setting-scale>
