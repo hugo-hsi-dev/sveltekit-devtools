@@ -464,6 +464,20 @@ h3 {
 	color: var(--nui-text);
 }
 
+.route-row.current {
+	border-color: rgba(var(--nui-c-context), 0.3);
+}
+
+.route-dot {
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	margin-right: 6px;
+	border-radius: 50%;
+	background: var(--nui-context);
+	vertical-align: middle;
+}
+
 .route-path {
 	overflow: hidden;
 	text-overflow: ellipsis;

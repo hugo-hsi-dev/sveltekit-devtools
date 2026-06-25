@@ -496,6 +496,54 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		}
 	});
 
+	// Push host-page state (resolved color scheme + current route) into the panel.
+	function postToIframe(msg) {
+		try {
+			if (iframe.contentWindow) iframe.contentWindow.postMessage(msg, location.origin);
+		} catch (e) {}
+	}
+	function detectScheme() {
+		var de = document.documentElement;
+		if (de.classList.contains('dark')) return 'dark';
+		if (de.classList.contains('light')) return 'light';
+		var attr = de.getAttribute('data-theme') || de.getAttribute('data-color-mode') || de.getAttribute('data-mode') || '';
+		if (attr === 'dark' || attr === 'light') return attr;
+		return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	}
+	function sendHostState() {
+		postToIframe({
+			type: 'sveltekit-devtools:host',
+			scheme: detectScheme(),
+			route: location.pathname + location.search,
+		});
+	}
+	iframe.addEventListener('load', function () {
+		sendHostState();
+		setTimeout(sendHostState, 300);
+	});
+	try {
+		new MutationObserver(sendHostState).observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class', 'data-theme', 'data-color-mode', 'data-mode'],
+		});
+	} catch (e) {}
+	if (window.matchMedia) {
+		try {
+			window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', sendHostState);
+		} catch (e) {}
+	}
+	['pushState', 'replaceState'].forEach(function (name) {
+		var orig = history[name];
+		if (typeof orig === 'function') {
+			history[name] = function () {
+				var result = orig.apply(this, arguments);
+				sendHostState();
+				return result;
+			};
+		}
+	});
+	window.addEventListener('popstate', sendHostState);
+
 	function formatDuration(ms) {
 		if (ms < 1000) return [String(Math.round(ms)), 'ms'];
 		if (ms < 60000) return [(ms / 1000).toFixed(1), 's'];

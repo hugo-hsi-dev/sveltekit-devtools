@@ -665,6 +665,42 @@ document.addEventListener('click', (event) => {
 	saveCollapsedSections();
 });
 
+// State pushed from the host page via the injected dock (theme + current route).
+let currentRoute = '';
+
+window.addEventListener('message', (event) => {
+	if (event.origin !== location.origin) return;
+	const data = event.data as { type?: string; scheme?: string; route?: string } | null;
+	if (data?.type !== 'sveltekit-devtools:host') return;
+	if ((data.scheme === 'dark' || data.scheme === 'light') && hostTheme !== data.scheme) {
+		hostTheme = data.scheme;
+		applySettings();
+	}
+	if (typeof data.route === 'string' && data.route !== currentRoute) {
+		currentRoute = data.route;
+		renderRoutesList();
+	}
+});
+
+function routeMatchesCurrent(routePath: string): boolean {
+	if (!currentRoute) return false;
+	const pathname = currentRoute.split('?')[0];
+	const pattern = routePath
+		.split('/')
+		.map((seg) => {
+			if (/^\[\.\.\..+\]$/.test(seg)) return '.*';
+			if (/^\[\[.+\]\]$/.test(seg)) return '[^/]*';
+			if (/^\[.+\]$/.test(seg)) return '[^/]+';
+			return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		})
+		.join('/');
+	try {
+		return new RegExp(`^${pattern}/?$`).test(pathname);
+	} catch {
+		return false;
+	}
+}
+
 function setView(next: View) {
 	if (!isViewVisible(settings, next)) return;
 	view = next;
@@ -942,10 +978,11 @@ function renderRoutesList() {
 		routes
 			.map((route) => {
 				const latest = latestLoad(route);
-				return `<button class="route-row ${route.id === selectedRoute ? 'active' : ''}" type="button" data-route="${escapeAttr(
-					route.id,
-				)}">
-				<span class="route-path">${escapeHtml(route.path)}</span>
+				const isCurrent = routeMatchesCurrent(route.path);
+				return `<button class="route-row ${route.id === selectedRoute ? 'active' : ''} ${
+					isCurrent ? 'current' : ''
+				}" type="button" data-route="${escapeAttr(route.id)}">
+				<span class="route-path">${isCurrent ? '<span class="route-dot" title="Current page"></span>' : ''}${escapeHtml(route.path)}</span>
 				<span class="badge ${latest ? 'hot' : ''}">${latest ? `${latest.duration} ms` : route.files.length}</span>
 			</button>`;
 			})
