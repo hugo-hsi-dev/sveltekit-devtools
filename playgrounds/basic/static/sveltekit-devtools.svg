@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 96" role="img" aria-label="SvelteKit Devtools">
+	<rect width="160" height="96" rx="10" fill="#101215" />
+	<path d="M45 22h70l14 14v38H31V22h14z" fill="#15191f" stroke="#2dd4bf" stroke-width="4" />
+	<circle cx="62" cy="48" r="12" fill="#ff3e00" />
+	<path d="M88 38h24M88 50h18M88 62h28" stroke="#f8fafc" stroke-width="6" stroke-linecap="round" />
+</svg>

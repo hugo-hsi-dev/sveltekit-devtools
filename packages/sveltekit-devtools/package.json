@@ -1,0 +1,45 @@
+{
+	"name": "sveltekit-devtools",
+	"version": "0.0.0",
+	"description": "Vite-powered devtools for SvelteKit",
+	"type": "module",
+	"license": "MIT",
+	"exports": {
+		".": {
+			"types": "./dist/node/index.d.ts",
+			"import": "./dist/node/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "pnpm clean && pnpm build:client && pnpm build:node",
+		"build:client": "vite build --config vite.client.config.ts",
+		"build:node": "tsc -p tsconfig.build.json",
+		"check": "tsc -p tsconfig.build.json --noEmit",
+		"clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
+		"lint": "prettier --check .",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@vitejs/devtools": "^0.3.3",
+		"@vitejs/devtools-kit": "^0.3.3"
+	},
+	"peerDependencies": {
+		"@sveltejs/kit": ">=2.0.0",
+		"typescript": ">=5.3.0",
+		"vite": ">=5.0.3"
+	},
+	"devDependencies": {
+		"@sveltejs/kit": "^2.68.0",
+		"@types/node": "^24.10.1",
+		"typescript": "^5.9.3",
+		"vite": "^7.3.0",
+		"vitest": "^4.1.8"
+	},
+	"engines": {
+		"node": ">=20.19"
+	}
+}
