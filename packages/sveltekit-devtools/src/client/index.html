@@ -4,157 +4,68 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>SvelteKit Devtools</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap"
+			rel="stylesheet"
+		/>
 	</head>
 	<body>
 		<div id="app">
-			<header class="shell-header">
-				<div>
-					<p class="eyebrow">SvelteKit</p>
-					<h1>Devtools</h1>
-				</div>
-				<div class="actions">
-					<span id="status" class="status">Connecting</span>
-					<button id="open-command-palette" type="button">Commands</button>
-					<button
-						id="refresh"
-						class="icon-button"
-						type="button"
-						title="Refresh"
-						aria-label="Refresh"
-					>
-						↻
-					</button>
-					<button id="clear-loads" type="button">Clear loads</button>
-				</div>
-			</header>
+			<nav id="rail" class="rail" aria-label="Views"></nav>
 
-			<section class="metrics" aria-label="Project metrics">
-				<div class="metric">
-					<span>Project</span>
-					<strong id="metric-project">-</strong>
-				</div>
-				<div class="metric">
-					<span>Routes</span>
-					<strong id="metric-routes">0</strong>
-				</div>
-				<div class="metric">
-					<span>Load calls</span>
-					<strong id="metric-loads">0</strong>
-				</div>
-				<div class="metric">
-					<span>Load fetches</span>
-					<strong id="metric-fetches">0</strong>
-				</div>
-				<div class="metric">
-					<span>Hook calls</span>
-					<strong id="metric-hook-events">0</strong>
-				</div>
-				<div class="metric">
-					<span>Imports</span>
-					<strong id="metric-imports">0</strong>
-				</div>
-				<div class="metric">
-					<span>Env vars</span>
-					<strong id="metric-env">0</strong>
-				</div>
-				<div class="metric">
-					<span>Build size</span>
-					<strong id="metric-build-size">0 B</strong>
-				</div>
-				<div class="metric">
-					<span>Slowest</span>
-					<strong id="metric-slowest">0 ms</strong>
-				</div>
-				<div class="metric">
-					<span>Server / Client</span>
-					<strong id="metric-sources">0 / 0</strong>
-				</div>
-				<div class="metric">
-					<span>Components</span>
-					<strong id="metric-components">0</strong>
-				</div>
-				<div class="metric">
-					<span>Remote functions</span>
-					<strong id="metric-remotes">0</strong>
-				</div>
-				<div class="metric">
-					<span>Server routes</span>
-					<strong id="metric-server-routes">0</strong>
-				</div>
-				<div class="metric">
-					<span>Actions</span>
-					<strong id="metric-actions">0</strong>
-				</div>
-				<div class="metric">
-					<span>Assets</span>
-					<strong id="metric-assets">0</strong>
-				</div>
-				<div class="metric">
-					<span>Virtual files</span>
-					<strong id="metric-virtual-files">0</strong>
-				</div>
-				<div class="metric">
-					<span>Modules</span>
-					<strong id="metric-modules">0</strong>
-				</div>
-				<div class="metric">
-					<span>Tasks</span>
-					<strong id="metric-tasks">0</strong>
-				</div>
-			</section>
+			<div class="content">
+				<header class="content-header">
+					<div id="view-title" class="view-title"></div>
+					<div class="actions">
+						<span id="status" class="status">Connecting</span>
+						<button id="open-command-palette" type="button">Commands</button>
+						<button
+							id="refresh"
+							class="icon-button"
+							type="button"
+							title="Refresh"
+							aria-label="Refresh"
+						>
+							↻
+						</button>
+						<button id="clear-loads" type="button">Clear loads</button>
+					</div>
+				</header>
 
-			<nav class="tabs" aria-label="Views">
-				<button class="tab active" type="button" data-view="overview">Overview</button>
-				<button class="tab" type="button" data-view="routes">Routes</button>
-				<button class="tab" type="button" data-view="loads">Load data</button>
-				<button class="tab" type="button" data-view="timeline">Timeline</button>
-				<button class="tab" type="button" data-view="hooks">Hooks</button>
-				<button class="tab" type="button" data-view="imports">Imports</button>
-				<button class="tab" type="button" data-view="plugins">Plugins</button>
-				<button class="tab" type="button" data-view="runtime-config">Runtime config</button>
-				<button class="tab" type="button" data-view="build-analyze">Build analyze</button>
-				<button class="tab" type="button" data-view="inspect">Inspect</button>
-				<button class="tab" type="button" data-view="tasks">Tasks</button>
-				<button class="tab" type="button" data-view="open-graph">Open Graph</button>
-				<button class="tab" type="button" data-view="remotes">Remotes</button>
-				<button class="tab" type="button" data-view="server-routes">Server routes</button>
-				<button class="tab" type="button" data-view="actions">Actions</button>
-				<button class="tab" type="button" data-view="assets">Assets</button>
-				<button class="tab" type="button" data-view="components">Components</button>
-				<button class="tab" type="button" data-view="virtual-files">Virtual files</button>
-				<button class="tab" type="button" data-view="settings">Settings</button>
-			</nav>
+				<div class="panel-area">
+					<aside id="routes-sidebar" class="routes-sidebar hidden">
+						<label class="search">
+							<span>Search routes</span>
+							<input id="route-search" type="search" autocomplete="off" placeholder="/blog/:slug" />
+						</label>
+						<div id="routes-list" class="routes-list"></div>
+					</aside>
 
-			<main class="workspace">
-				<aside class="sidebar">
-					<label class="search">
-						<span>Search routes</span>
-						<input id="route-search" type="search" autocomplete="off" placeholder="/blog/:slug" />
-					</label>
-					<div id="routes-list" class="routes-list"></div>
-				</aside>
-				<section class="panel">
-					<div id="overview-view" class="view"></div>
-					<div id="routes-view" class="view hidden"></div>
-					<div id="loads-view" class="view hidden"></div>
-					<div id="timeline-view" class="view hidden"></div>
-					<div id="hooks-view" class="view hidden"></div>
-					<div id="imports-view" class="view hidden"></div>
-					<div id="plugins-view" class="view hidden"></div>
-					<div id="runtime-config-view" class="view hidden"></div>
-					<div id="build-analyze-view" class="view hidden"></div>
-					<div id="inspect-view" class="view hidden"></div>
-					<div id="tasks-view" class="view hidden"></div>
-					<div id="open-graph-view" class="view hidden"></div>
-					<div id="remotes-view" class="view hidden"></div>
-					<div id="server-routes-view" class="view hidden"></div>
-					<div id="actions-view" class="view hidden"></div>
-					<div id="assets-view" class="view hidden"></div>
-					<div id="components-view" class="view hidden"></div>
-					<div id="virtual-files-view" class="view hidden"></div>
-					<div id="settings-view" class="view hidden"></div>
-				</section>
-			</main>
+					<section class="panel">
+						<div id="overview-view" class="view"></div>
+						<div id="routes-view" class="view hidden"></div>
+						<div id="loads-view" class="view hidden"></div>
+						<div id="timeline-view" class="view hidden"></div>
+						<div id="hooks-view" class="view hidden"></div>
+						<div id="imports-view" class="view hidden"></div>
+						<div id="plugins-view" class="view hidden"></div>
+						<div id="runtime-config-view" class="view hidden"></div>
+						<div id="build-analyze-view" class="view hidden"></div>
+						<div id="inspect-view" class="view hidden"></div>
+						<div id="tasks-view" class="view hidden"></div>
+						<div id="open-graph-view" class="view hidden"></div>
+						<div id="remotes-view" class="view hidden"></div>
+						<div id="server-routes-view" class="view hidden"></div>
+						<div id="actions-view" class="view hidden"></div>
+						<div id="assets-view" class="view hidden"></div>
+						<div id="components-view" class="view hidden"></div>
+						<div id="virtual-files-view" class="view hidden"></div>
+						<div id="settings-view" class="view hidden"></div>
+					</section>
+				</div>
+			</div>
 		</div>
 		<div id="command-palette" class="palette hidden"></div>
 		<script type="module" src="/main.ts"></script>

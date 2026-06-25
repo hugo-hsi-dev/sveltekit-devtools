@@ -43,6 +43,8 @@ import {
 import { bestSeoDescription, bestSeoImage, bestSeoTitle, missingSeoTags } from './seo';
 import { isViewVisible, normalizeSettings, setHiddenView, type DevtoolsSettings } from './settings';
 import { timelineEvents, type TimelineEvent } from './timeline';
+import { icons, svelteLogo } from './shared/icons';
+import { railEntries } from './shared/view-context';
 
 type View =
 	| 'overview'
@@ -109,6 +111,9 @@ const virtualFilesViewEl = element('#virtual-files-view');
 const settingsViewEl = element('#settings-view');
 const commandPaletteEl = element('#command-palette');
 const searchEl = element<HTMLInputElement>('#route-search');
+const railEl = element('#rail');
+const viewTitleEl = element('#view-title');
+const routesSidebarEl = element('#routes-sidebar');
 const allViews: View[] = [
 	'overview',
 	'routes',
@@ -492,6 +497,11 @@ document.addEventListener('keydown', (event) => {
 	}
 });
 
+const initialHash = location.hash.slice(1) as View;
+if (allViews.includes(initialHash) && isViewVisible(settings, initialHash)) {
+	view = initialHash;
+}
+
 void refresh();
 setInterval(() => {
 	if (!document.hidden && Date.now() > pauseAutoRefreshUntil) void refresh(false);
@@ -563,6 +573,7 @@ function applySettings() {
 function setView(next: View) {
 	if (!isViewVisible(settings, next)) return;
 	view = next;
+	history.replaceState(null, '', `#${next}`);
 	render();
 	if (view === 'open-graph') void requestSeoMeta();
 }
@@ -681,9 +692,9 @@ async function runCommand(id: string) {
 
 function render() {
 	applySettings();
-	renderTabs();
-	renderMetrics();
+	renderRail();
 	renderRoutesList();
+	routesSidebarEl.classList.toggle('hidden', view !== 'routes');
 	overviewViewEl.classList.toggle('hidden', view !== 'overview');
 	routesViewEl.classList.toggle('hidden', view !== 'routes');
 	loadsViewEl.classList.toggle('hidden', view !== 'loads');
@@ -725,39 +736,31 @@ function render() {
 	renderPalette();
 }
 
-function renderTabs() {
+function renderRail() {
 	if (!isViewVisible(settings, view)) view = 'overview';
-	document.querySelectorAll<HTMLButtonElement>('.tab[data-view]').forEach((tab) => {
-		const tabView = tab.dataset.view as View;
-		tab.classList.toggle('hidden', !isViewVisible(settings, tabView));
-		tab.classList.toggle('active', tabView === view);
-	});
-}
 
-function renderMetrics() {
-	const slowest = state.loads.reduce((max, event) => Math.max(max, event.duration), 0);
-	const server = state.loads.filter((event) => event.source === 'server').length;
-	const client = state.loads.length - server;
-	const fetches = loadFetchCount();
+	const tabs = railEntries
+		.filter((entry) => isViewVisible(settings, entry.view))
+		.map(
+			(entry) =>
+				`${entry.divider ? '<div class="rail-divider"></div>' : ''}<button class="rail-tab tab ${
+					entry.view === view ? 'active' : ''
+				}" type="button" data-view="${escapeAttr(entry.view)}" title="${escapeAttr(
+					viewLabels[entry.view],
+				)}" aria-label="${escapeAttr(viewLabels[entry.view])}">${icons[entry.view] ?? ''}</button>`,
+		)
+		.join('');
 
-	text('#metric-project', state.project.name || '-');
-	text('#metric-routes', String(state.routes.length));
-	text('#metric-loads', String(state.loads.length));
-	text('#metric-fetches', String(fetches));
-	text('#metric-hook-events', String(state.hookEvents.length));
-	text('#metric-imports', String(state.imports.length));
-	text('#metric-env', String(state.runtimeConfig.env.length));
-	text('#metric-build-size', formatBytes(state.buildAnalysis.totalSize));
-	text('#metric-slowest', `${slowest} ms`);
-	text('#metric-sources', `${server} / ${client}`);
-	text('#metric-components', String(state.components.length));
-	text('#metric-remotes', String(state.remotes.length));
-	text('#metric-server-routes', String(state.serverRoutes.length));
-	text('#metric-actions', String(state.routeActions.length));
-	text('#metric-assets', String(state.assets.length));
-	text('#metric-virtual-files', String(state.virtualFiles.length));
-	text('#metric-modules', String(state.moduleGraph.totalModules));
-	text('#metric-tasks', String(state.tasks.length));
+	railEl.innerHTML = `<div class="rail-logo">${svelteLogo}</div>
+		${tabs}
+		<div class="rail-spacer"></div>
+		<div class="rail-footer">
+			<button class="rail-tab tab ${
+				view === 'settings' ? 'active' : ''
+			}" type="button" data-view="settings" title="Settings" aria-label="Settings">${icons.settings}</button>
+		</div>`;
+
+	viewTitleEl.innerHTML = `${icons[view] ?? ''}<h1>${escapeHtml(viewLabels[view])}</h1>`;
 }
 
 function renderOverview() {
@@ -1542,7 +1545,6 @@ async function runBuildAnalyze() {
 		buildAnalysis: (await response.json()) as BuildAnalysis,
 	};
 	renderBuildAnalyze();
-	renderMetrics();
 }
 
 function renderRuntimeEnvRow(item: RuntimeEnvVar) {
