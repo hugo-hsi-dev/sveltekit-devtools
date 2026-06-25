@@ -23,6 +23,8 @@ test('normalizes stored settings', () => {
 		hiddenViews: ['routes'],
 		scale: defaultDevtoolsSettings.scale,
 		compact: true,
+		theme: defaultDevtoolsSettings.theme,
+		editor: defaultDevtoolsSettings.editor,
 	});
 });
 
