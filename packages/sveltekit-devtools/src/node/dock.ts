@@ -39,6 +39,10 @@ const dockCss = `
 	outline: none;
 	color: inherit;
 }
+.sk-anchor button:focus-visible {
+	outline: 2px solid #ff8a00;
+	outline-offset: 2px;
+}
 .sk-panel {
 	position: absolute;
 	left: 0;
@@ -209,6 +213,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 	var STORAGE_KEY = 'sveltekit-devtools:dock';
 	var MARGIN = 10;
 	var SNAP_THRESHOLD = 2;
+	var MOVE_THRESHOLD = 4;
 	var PANEL_MIN = 20;
 	var PANEL_MAX = 100;
 
@@ -241,6 +246,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 	var hovering = false;
 	var minimizeTimer = null;
 	var dragOffset = { x: 0, y: 0 };
+	var dragStart = { x: 0, y: 0 };
 
 	var host = document.createElement('div');
 	host.setAttribute('id', 'sveltekit-devtools-dock');
@@ -297,7 +303,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		h.className = 'sk-resize sk-resize-' + kind;
 		if (cursor) h.style.cursor = cursor;
 		h.addEventListener('mousedown', function (e) { e.preventDefault(); resizing = sides; });
-		h.addEventListener('touchstart', function () { resizing = sides; }, { passive: true });
+		h.addEventListener('touchstart', function (e) { e.preventDefault(); resizing = sides; }, { passive: false });
 		frame.appendChild(h);
 		handles.push({ el: h, sides: sides });
 		return h;
@@ -399,6 +405,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		moved = false;
 		dragOffset.x = e.clientX - panel.getBoundingClientRect().left - panel.getBoundingClientRect().width / 2;
 		dragOffset.y = e.clientY - panel.getBoundingClientRect().top - panel.getBoundingClientRect().height / 2;
+		dragStart.x = e.clientX;
+		dragStart.y = e.clientY;
 	});
 
 	toggleBtn.addEventListener('click', function (e) {
@@ -415,7 +423,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		var x = e.clientX - dragOffset.x;
 		var y = e.clientY - dragOffset.y;
 		if (isNaN(x) || isNaN(y)) return;
-		if (Math.abs(e.clientX - (cx + dragOffset.x)) > 0) moved = true;
+		if (!moved && Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) <= MOVE_THRESHOLD) return;
 		moved = true;
 
 		var deg = Math.atan2(y - cy, x - cx);
@@ -442,6 +450,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 
 	function handleResize(e) {
 		if (!resizing || !state.open) return;
+		if (e.cancelable) e.preventDefault();
 		var point = e.touches && e.touches[0] ? e.touches[0] : e;
 		var box = iframe.getBoundingClientRect();
 		if (resizing.right) {
@@ -457,7 +466,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.
 		render();
 	}
 	window.addEventListener('mousemove', handleResize);
-	window.addEventListener('touchmove', handleResize);
+	window.addEventListener('touchmove', handleResize, { passive: false });
 	function endResize() { if (resizing) { resizing = false; saveState(); render(); } }
 	window.addEventListener('mouseup', endResize);
 	window.addEventListener('touchend', endResize);
