@@ -1097,7 +1097,7 @@ body[data-density='compact'] .load-card {
 	width: 1px;
 	height: 1px;
 	overflow: hidden;
-	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
 	white-space: nowrap;
 }
 
@@ -1383,7 +1383,7 @@ body[data-density='compact'] .load-card {
 		width: auto;
 		height: auto;
 		overflow: visible;
-		clip: auto;
+		clip-path: none;
 		white-space: normal;
 	}
 

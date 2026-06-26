@@ -113,6 +113,14 @@
 		{ value: 'relative', label: 'Relative' },
 		{ value: 'asset', label: 'Asset' },
 	];
+	const moduleKinds: ModuleGraphModuleInfo['kind'][] = [
+		'source',
+		'dependency',
+		'virtual',
+		'style',
+		'asset',
+	];
+	const configurableViewSet = new Set<string>(configurableViews);
 
 	let state: DevtoolsState = emptyState();
 	let view: View = 'overview';
@@ -156,6 +164,7 @@
 	let seoMeta: SeoMeta | null = null;
 	let seoStatus: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
 	let seoError = '';
+	let pendingSeoRoute = '';
 
 	let paletteOpen = false;
 	let paletteQuery = '';
@@ -165,7 +174,8 @@
 	$: routeList = searchItems(state.routes, routeQuery, ['path', 'id']);
 	$: selectedRouteData =
 		state.routes.find((route) => route.id === selectedRoute) ?? state.routes[0] ?? null;
-	$: routeMatches = matchedRoutes(state.routes, routeInput || currentRoute || '/');
+	$: pinnedViews = settings.pinnedViews.filter(isConfigurableView);
+	$: routeMatches = matchedRoutes(state.routes, stripAppBase(routeInput || currentRoute || '/'));
 	$: importCounts = importKindCounts(state.imports);
 	$: importsByFilter = filterImports(state.imports, { kind: importKind });
 	$: visibleImports = searchItems(importsByFilter, importQuery, [
@@ -259,9 +269,10 @@
 		try {
 			state = await readState();
 			selectedRoute ||= state.routes[0]?.id ?? '';
-			if (!routeInput || routeInput === '/')
-				routeInput = currentRoute || state.routes[0]?.path || '/';
-			if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = currentRoute || '/';
+			if (!routeInput || routeInput === '/') {
+				routeInput = withAppBase(currentRoute || state.routes[0]?.path || '/');
+			}
+			if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = withAppBase(currentRoute || '/');
 			setStatus('Live', 'live');
 		} catch (error) {
 			setStatus(errorMessage(error), 'error');
@@ -313,6 +324,10 @@
 			isViewVisible(settings, item) &&
 			(!category || pinned || isCategoryVisible(settings, category))
 		);
+	}
+
+	function isConfigurableView(item: string): item is View {
+		return configurableViewSet.has(item);
 	}
 
 	function categoryViews(category: (typeof navCategories)[number]) {
@@ -367,14 +382,17 @@
 	}
 
 	function routeOpenPath(route: SvelteKitRoute) {
-		return fillRoutePath(route.path, routeParamValues(route));
+		return withAppBase(fillRoutePath(route.path, routeParamValues(route)));
 	}
 
 	function routeParamValues(route: SvelteKitRoute) {
-		routeParamInputs[route.id] ??= Object.fromEntries(
+		const existing = routeParamInputs[route.id];
+		if (existing) return existing;
+		const values = Object.fromEntries(
 			routePathParams(route.path).map((param) => [param.name, defaultRouteParamValue(param)]),
 		);
-		return routeParamInputs[route.id];
+		routeParamInputs = { ...routeParamInputs, [route.id]: values };
+		return values;
 	}
 
 	function setRouteParam(route: SvelteKitRoute, param: RoutePathParam, value: string) {
@@ -387,17 +405,19 @@
 	}
 
 	function openRoute(path: string, refreshSeo = false) {
-		const next = normalizeRouteInput(path);
-		if (!next.startsWith('/')) {
-			setStatus('Route must start with /', 'error');
-			return;
-		}
+		const next = withAppBase(path);
 		if (window.parent === window) {
+			if (refreshSeo) {
+				seoStatus = 'error';
+				seoError = 'Open Graph refresh requires the docked app page.';
+				setStatus('Open Graph needs dock mode', 'error');
+				return;
+			}
 			location.assign(next);
 			return;
 		}
+		if (refreshSeo) pendingSeoRoute = next;
 		window.parent.postMessage({ type: 'sveltekit-devtools:navigate', path: next }, location.origin);
-		if (refreshSeo) setTimeout(() => void requestSeoMeta(), 700);
 	}
 
 	async function requestSeoMeta() {
@@ -712,7 +732,7 @@
 		const values = Object.fromEntries(
 			routePathParams(action.path).map((param) => [param.name, defaultRouteParamValue(param)]),
 		);
-		const path = fillRoutePath(action.path, values);
+		const path = withAppBase(fillRoutePath(action.path, values));
 		return action.default ? path : `${path}?/${encodeURIComponent(action.name)}`;
 	}
 
@@ -720,26 +740,30 @@
 		const values = Object.fromEntries(
 			routePathParams(route.path).map((param) => [param.name, defaultRouteParamValue(param)]),
 		);
-		return fillRoutePath(route.path, values);
+		return withAppBase(fillRoutePath(route.path, values));
 	}
 
 	async function openSourceFile(file: string, line?: number, column?: number) {
 		if (!file) return;
 		const target = file.startsWith('/') ? file : `${state.root}/${file}`;
 		const positioned = line ? `${target}:${line}${column ? `:${column}` : ''}` : target;
-		const rpc = await rpcClient();
-		if (rpc) {
-			await rpc.call('vite:core:open-in-editor', positioned);
-			setStatus('Opened file', 'live');
-			return;
-		}
 		try {
-			const response = await fetch(api('open-in-editor'), {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ file: target, line, column, editor: settings.editor || undefined }),
-			});
-			if (!response.ok) throw new Error('Open in editor failed');
+			const rpc = await rpcClient();
+			if (rpc) {
+				await rpc.call('vite:core:open-in-editor', positioned);
+			} else {
+				const response = await fetch(api('open-in-editor'), {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						file: target,
+						line,
+						column,
+						editor: settings.editor || undefined,
+					}),
+				});
+				if (!response.ok) throw new Error('Open in editor failed');
+			}
 			setStatus('Opened file', 'live');
 		} catch {
 			setStatus('Open file failed', 'error');
@@ -816,10 +840,17 @@
 			hostTheme = data.scheme;
 			applySettings();
 		}
-		if (typeof data.route === 'string' && data.route !== currentRoute) {
-			currentRoute = data.route;
-			if (!routeInput || routeInput === '/') routeInput = data.route;
-			if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = data.route;
+		if (typeof data.route === 'string') {
+			const route = withAppBase(data.route);
+			if (route !== currentRoute) {
+				currentRoute = route;
+				if (!routeInput || routeInput === '/') routeInput = route;
+				if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = route;
+			}
+			if (pendingSeoRoute && route === pendingSeoRoute) {
+				pendingSeoRoute = '';
+				void requestSeoMeta();
+			}
 		}
 	}
 
@@ -871,7 +902,28 @@
 	}
 
 	function routeIsCurrent(route: SvelteKitRoute) {
-		return currentRoute ? routeMatchesPath(route.path, currentRoute) : false;
+		return currentRoute ? routeMatchesPath(route.path, stripAppBase(currentRoute)) : false;
+	}
+
+	function appBase() {
+		const base = state.runtimeConfig.base || '/';
+		if (base === '/') return '';
+		return `/${base.replace(/^\/|\/$/g, '')}`;
+	}
+
+	function withAppBase(path: string) {
+		const value = normalizeRouteInput(path);
+		const base = appBase();
+		if (!base || value === base || value.startsWith(`${base}/`)) return value;
+		return `${base}${value}`;
+	}
+
+	function stripAppBase(path: string) {
+		const value = normalizeRouteInput(path);
+		const base = appBase();
+		if (!base) return value;
+		if (value === base) return '/';
+		return value.startsWith(`${base}/`) ? value.slice(base.length) : value;
 	}
 
 	function latestLoad(route: SvelteKitRoute) {
@@ -989,7 +1041,7 @@
 		{#if settings.pinnedViews.length}
 			<div class="sidebar-category">
 				<span>Pinned</span>
-				{#each settings.pinnedViews.filter((item) => isViewVisible(settings, item)) as item}
+				{#each pinnedViews.filter((item) => isViewVisible(settings, item)) as item}
 					<button
 						class="sidebar-row"
 						class:active={view === item}
@@ -1179,7 +1231,10 @@
 									<article class="result-card">
 										<h3>Matched route</h3>
 										{#if routeMatches[0]}
-											{@const match = matchRoutePath(routeMatches[0].path, routeInput)}
+											{@const match = matchRoutePath(
+												routeMatches[0].path,
+												stripAppBase(routeInput),
+											)}
 											<div class="meta-list">
 												<MetaRow label="Route" value={routeMatches[0].path} />
 												<MetaRow label="Params" value={json(match.params)} />
@@ -1599,7 +1654,7 @@
 							<article class="result-card">
 								<h3>By kind</h3>
 								<div class="meta-list">
-									{#each ['source', 'dependency', 'virtual', 'style', 'asset'] as kind}
+									{#each moduleKinds as kind}
 										<MetaRow label={kind} value={String(moduleKindCount(graph, kind))} />
 									{/each}
 								</div>

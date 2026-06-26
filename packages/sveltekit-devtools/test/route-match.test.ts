@@ -21,8 +21,10 @@ test('matches static, dynamic, optional, rest, and unmatched paths', () => {
 	expect(matchRoutePath('/blog/:slug', '/blog/hello').params).toEqual({ slug: 'hello' });
 	expect(routeMatchesPath('/docs/:section?', '/docs')).toBe(true);
 	expect(matchRoutePath('/docs/:section?', '/docs/api').params).toEqual({ section: 'api' });
+	expect(matchRoutePath('/docs/:section?/edit', '/docs/edit').params).toEqual({});
 	expect(matchRoutePath('/files/*path', '/files/a/b/c').params).toEqual({ path: 'a/b/c' });
 	expect(routeMatchesPath('/blog/:slug', '/blog')).toBe(false);
+	expect(routeMatchesPath('/blog/:slug', '/blog/%E0%A4%A')).toBe(false);
 });
 
 test('returns matched route list', () => {

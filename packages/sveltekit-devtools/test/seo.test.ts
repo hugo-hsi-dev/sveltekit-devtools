@@ -49,3 +49,16 @@ test('reports missing SEO tags and derives preview text', () => {
 		['meta', 'og:description', 'Social description'],
 	]);
 });
+
+test('drops partial raw SEO tags', () => {
+	expect(
+		normalizeSeoTags({
+			...emptyMeta,
+			tags: [
+				{ tag: 'meta', name: 'description', value: 'Page description' },
+				{ tag: 'meta', name: '', value: 'broken' },
+				{ tag: '', name: 'og:title', value: 'broken' },
+			],
+		}),
+	).toEqual([{ tag: 'meta', name: 'description', value: 'Page description' }]);
+});

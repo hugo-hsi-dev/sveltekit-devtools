@@ -18,7 +18,7 @@
 		"build": "pnpm clean && pnpm build:client && pnpm build:node",
 		"build:client": "vite build --config vite.client.config.ts",
 		"build:node": "tsc -p tsconfig.build.json",
-		"check": "tsc -p tsconfig.build.json --noEmit",
+		"check": "svelte-check --tsconfig tsconfig.client.json && tsc -p tsconfig.build.json --noEmit",
 		"clean": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
 		"lint": "prettier --check .",
 		"test": "vitest run"
@@ -42,6 +42,7 @@
 		"@types/node": "^24.10.1",
 		"fuse.js": "^7.4.2",
 		"svelte": "^5.56.4",
+		"svelte-check": "^4.7.1",
 		"typescript": "^5.9.3",
 		"vis-data": "^8.0.4",
 		"vis-network": "^10.1.0",

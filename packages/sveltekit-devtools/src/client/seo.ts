@@ -74,7 +74,7 @@ export function bestSeoImage(meta: SeoMeta) {
 
 export function normalizeSeoTags(meta: SeoMeta): SeoTag[] {
 	const tags = Array.isArray(meta.tags) ? meta.tags : [];
-	if (tags.length) return tags.filter((tag) => tag.name || tag.value);
+	if (tags.length) return tags.filter((tag) => tag.tag && tag.name && tag.value);
 
 	return [
 		{ tag: 'title', name: '<title>', value: meta.title },

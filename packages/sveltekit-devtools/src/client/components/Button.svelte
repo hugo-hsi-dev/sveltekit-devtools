@@ -4,6 +4,6 @@
 	export let title = '';
 </script>
 
-<button {type} {disabled} {title} on:click>
+<button {...$$restProps} {type} {disabled} {title} on:click>
 	<slot />
 </button>

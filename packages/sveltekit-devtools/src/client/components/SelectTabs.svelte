@@ -3,12 +3,11 @@
 	export let options: Array<{ value: string; label: string; count?: number }> = [];
 </script>
 
-<div class="select-tabs" role="tablist">
+<div class="select-tabs">
 	{#each options as option}
 		<button
 			type="button"
 			class:active={option.value === value}
-			aria-selected={option.value === value}
 			on:click={() => (value = option.value)}
 		>
 			{option.label}

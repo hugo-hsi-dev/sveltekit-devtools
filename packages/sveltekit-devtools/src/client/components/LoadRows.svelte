@@ -7,9 +7,17 @@
 	export let empty = 'No load events found';
 
 	$: max = Math.max(1, ...events.map((event) => event.duration));
+	$: maxFetch = Math.max(
+		1,
+		...events.flatMap((event) => (event.fetches ?? []).map((fetch) => fetch.duration)),
+	);
 
 	function width(duration: number) {
 		return Math.max(4, Math.round((duration / max) * 100));
+	}
+
+	function fetchWidth(duration: number) {
+		return Math.max(4, Math.round((duration / maxFetch) * 100));
 	}
 
 	function serializedText(value: SerializedValue | undefined) {
@@ -85,7 +93,7 @@
 									<div>
 										<code>{fetch.statusText || 'fetch'}</code>
 										<div class="bar">
-											<span style={`width:${Math.min(100, Math.max(4, fetch.duration))}%`}></span>
+											<span style={`width:${fetchWidth(fetch.duration)}%`}></span>
 										</div>
 									</div>
 									<div>

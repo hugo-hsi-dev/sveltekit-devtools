@@ -61,7 +61,7 @@ export function normalizeSettings(
 		hiddenCategories,
 		pinnedViews,
 		scale,
-		compact: Boolean(value?.compact),
+		compact: typeof value?.compact === 'boolean' ? value.compact : defaultDevtoolsSettings.compact,
 		theme,
 		editor: typeof value?.editor === 'string' ? value.editor.slice(0, 64) : '',
 		sidebarExpanded:
