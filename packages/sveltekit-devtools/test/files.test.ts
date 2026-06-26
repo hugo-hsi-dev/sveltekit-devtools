@@ -18,11 +18,12 @@ afterEach(async () => {
 	await rm(root, { recursive: true, force: true });
 });
 
-test('walkFiles follows symlinked directories without cycling', async () => {
+test('walkFiles follows symlinked directories without cycling', async (ctx) => {
 	try {
 		await symlink(path.join(root, 'real'), path.join(root, 'link'), 'dir');
 		await symlink(root, path.join(root, 'real/self'), 'dir');
 	} catch {
+		ctx.skip();
 		return;
 	}
 
