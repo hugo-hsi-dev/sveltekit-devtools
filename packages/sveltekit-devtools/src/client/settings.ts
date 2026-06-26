@@ -86,6 +86,7 @@ export function setHiddenView(
 	view: string,
 	hidden: boolean,
 	configurableViews: readonly string[],
+	configurableCategories: readonly string[] = defaultCategories,
 ) {
 	return normalizeSettings(
 		{
@@ -95,6 +96,7 @@ export function setHiddenView(
 				: settings.hiddenViews.filter((item) => item !== view),
 		},
 		configurableViews,
+		configurableCategories,
 	);
 }
 

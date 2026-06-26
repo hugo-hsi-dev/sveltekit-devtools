@@ -53,6 +53,20 @@ test('toggles hidden views', () => {
 	expect(visible.hiddenViews).toEqual([]);
 });
 
+test('preserves custom categories when toggling hidden views', () => {
+	const customCategories = ['app', 'server', 'custom'];
+	const settings = normalizeSettings(
+		{ ...defaultDevtoolsSettings, hiddenCategories: ['custom'] },
+		views,
+		customCategories,
+	);
+
+	const hidden = setHiddenView(settings, 'loads', true, views, customCategories);
+
+	expect(hidden.hiddenViews).toEqual(['loads']);
+	expect(hidden.hiddenCategories).toEqual(['custom']);
+});
+
 test('toggles hidden categories and pinned views', () => {
 	const hidden = setHiddenCategory(defaultDevtoolsSettings, 'server', true, views, categories);
 	const shown = setHiddenCategory(hidden, 'server', false, views, categories);

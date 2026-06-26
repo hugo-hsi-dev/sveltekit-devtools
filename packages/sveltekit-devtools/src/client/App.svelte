@@ -781,7 +781,7 @@
 	}
 
 	function toggleHiddenView(item: string, hidden: boolean) {
-		settings = setHiddenView(settings, item, hidden, configurableViews);
+		settings = setHiddenView(settings, item, hidden, configurableViews, configurableCategories);
 		saveSettings();
 		if (view === item && hidden) setView('overview');
 	}
