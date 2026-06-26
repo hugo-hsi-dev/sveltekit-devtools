@@ -114,7 +114,7 @@ Svelte supports asynchronous server-side rendering (SSR) with the `render(...)` 
 import { render } from 'svelte/server';
 import App from './App.svelte';
 
-const { head, body } = +++await+++ render(App);
+const { head, body } = await render(App);
 ```
 
 > [!NOTE] If you're using a framework like SvelteKit, this is done on your behalf.
@@ -177,4 +177,4 @@ As an experimental feature, the details of how `await` is handled (and related A
 
 ## Breaking changes
 
-Effects run in a slightly different order when the `experimental.async` option is `true`. Specifically, _block_ effects like `{#if ...}` and `{#each ...}` now run before an `$effect.pre` or `beforeUpdate` in the same component, which means that in very rare situations.
+Effects run in a slightly different order when the `experimental.async` option is `true`. Specifically, _block_ effects like `{#if ...}` and `{#each ...}` now run before an `$effect.pre` or `beforeUpdate` in the same component, which means code that depends on precise effect ordering should be reviewed when enabling async mode.

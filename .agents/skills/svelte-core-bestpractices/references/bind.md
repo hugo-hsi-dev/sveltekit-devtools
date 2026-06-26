@@ -6,7 +6,7 @@ You can also use `bind:property={get, set}`, where `get` and `set` are functions
 <input bind:value={() => value, (v) => (value = v.toLowerCase())} />
 ```
 
-In the case of readonly bindings like [dimension bindings](#Dimensions), the `get` value should be `null`:
+In the case of readonly bindings like dimension bindings, the `get` value should be `null`:
 
 ```svelte
 <div bind:clientWidth={null, redraw} bind:clientHeight={null, redraw}>...</div>

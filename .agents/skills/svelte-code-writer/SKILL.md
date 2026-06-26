@@ -63,4 +63,4 @@ npx @sveltejs/mcp svelte-autofixer ./Component.svelte --svelte-version 4
 
 1. **Uncertain about syntax?** Run `list-sections` then `get-documentation` for relevant topics
 2. **Reviewing/debugging?** Run `svelte-autofixer` on the code to detect issues
-3. **Always validate** - Run `svelte-autofixer` before finalizing any Svelte component
+3. **Always validate edits** - After `list-sections`/`get-documentation` as needed, run `svelte-autofixer` before finalizing Svelte component edits or supported `.svelte.ts`/`.svelte.js` module edits. Skip autofixer for analysis-only tasks.
