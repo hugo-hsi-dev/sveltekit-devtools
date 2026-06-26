@@ -2,8 +2,8 @@
 	import type { VirtualFileInfo } from '../../shared/types';
 	import Badge from './Badge.svelte';
 
-	export let file: VirtualFileInfo;
-	export let onOpen: (file: string) => void = () => {};
+	let { file, onOpen = () => {} }: { file: VirtualFileInfo; onOpen?: (file: string) => void } =
+		$props();
 
 	function formatBytes(bytes: number) {
 		if (bytes < 1024) return `${bytes} B`;
@@ -28,7 +28,7 @@
 			<strong>{formatBytes(file.size)}</strong>
 			<div class="muted">{file.truncated ? 'preview' : 'full'}</div>
 		</div>
-		<button type="button" on:click={() => onOpen(file.path)}>Open file</button>
+		<button type="button" onclick={() => onOpen(file.path)}>Open file</button>
 	</div>
 	<pre class="json-view">{file.text}{file.truncated ? '\n... truncated' : ''}</pre>
 </article>

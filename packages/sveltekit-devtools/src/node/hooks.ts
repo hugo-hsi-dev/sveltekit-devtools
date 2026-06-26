@@ -3,6 +3,7 @@ import path from 'node:path';
 import * as ts from 'typescript';
 
 import type { HookEnvironment, HookInfo } from '../shared/types.js';
+import { fileExists, slash } from './files.js';
 
 interface ScanHooksOptions {
 	root: string;
@@ -118,7 +119,9 @@ async function existingHookFiles(srcDir: string) {
 		'hooks.js',
 	].map((file) => path.join(srcDir, file));
 
-	const found = await Promise.all(files.map(async (file) => ((await exists(file)) ? file : null)));
+	const found = await Promise.all(
+		files.map(async (file) => ((await fileExists(file)) ? file : null)),
+	);
 	return found.filter((file): file is string => Boolean(file));
 }
 
@@ -162,19 +165,6 @@ function isExported(node: ts.Node) {
 	);
 }
 
-async function exists(file: string) {
-	try {
-		const found = await stat(file);
-		return found.isFile();
-	} catch {
-		return false;
-	}
-}
-
 function withoutExportKeyword(value: string) {
 	return value.replace(/^export\s+/, '');
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

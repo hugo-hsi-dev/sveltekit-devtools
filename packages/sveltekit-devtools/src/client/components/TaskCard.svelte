@@ -2,9 +2,15 @@
 	import type { TaskScriptInfo } from '../../shared/types';
 	import Badge from './Badge.svelte';
 
-	export let task: TaskScriptInfo;
-	export let running = false;
-	export let onRun: (task: TaskScriptInfo) => void = () => {};
+	let {
+		task,
+		running = false,
+		onRun = () => {},
+	}: {
+		task: TaskScriptInfo;
+		running?: boolean;
+		onRun?: (task: TaskScriptInfo) => void;
+	} = $props();
 </script>
 
 <article class="result-card">
@@ -15,7 +21,7 @@
 		</div>
 		<Badge tone={task.runnable ? 'hot' : 'warn'}>{task.runnable ? 'runnable' : 'disabled'}</Badge>
 	</div>
-	<button type="button" disabled={running || !task.runnable} on:click={() => onRun(task)}>
+	<button type="button" disabled={running || !task.runnable} onclick={() => onRun(task)}>
 		{running ? 'Running' : 'Run'}
 	</button>
 	{#if task.reason}<p class="muted">{task.reason}</p>{/if}

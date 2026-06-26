@@ -3,18 +3,26 @@
 	import Badge from './Badge.svelte';
 	import TextCard from './TextCard.svelte';
 
-	export let module: ModuleGraphModuleInfo;
-	export let graph: ModuleGraphInfo;
-	export let onOpen: (file: string) => void = () => {};
+	let {
+		module,
+		graph,
+		onOpen = () => {},
+	}: {
+		module: ModuleGraphModuleInfo;
+		graph: ModuleGraphInfo;
+		onOpen?: (file: string) => void;
+	} = $props();
 
-	$: maxEdges = Math.max(
-		1,
-		...graph.modules.map((item) => item.importers.length + item.importedModules.length),
+	let maxEdges = $derived(
+		Math.max(
+			1,
+			...graph.modules.map((item) => item.importers.length + item.importedModules.length),
+		),
 	);
-	$: edges = module.importers.length + module.importedModules.length;
-	$: width = Math.max(4, Math.round((edges / maxEdges) * 100));
-	$: title = module.file || module.url || module.id;
-	$: hmr =
+	let edges = $derived(module.importers.length + module.importedModules.length);
+	let width = $derived(Math.max(4, Math.round((edges / maxEdges) * 100)));
+	let title = $derived(module.file || module.url || module.id);
+	let hmr = $derived(
 		[
 			module.selfAccepting ? 'self accepting' : '',
 			module.acceptedHmrDeps.length ? `deps: ${module.acceptedHmrDeps.join(', ')}` : '',
@@ -26,7 +34,8 @@
 				: '',
 		]
 			.filter(Boolean)
-			.join('\n') || 'none';
+			.join('\n') || 'none',
+	);
 </script>
 
 <article class="load-card">
@@ -45,7 +54,7 @@
 		</div>
 		<div class="module-actions">
 			<Badge tone={module.kind === 'source' ? 'hot' : 'default'}>{module.kind}</Badge>
-			{#if module.file}<button type="button" on:click={() => onOpen(module.file)}>Open file</button
+			{#if module.file}<button type="button" onclick={() => onOpen(module.file)}>Open file</button
 				>{/if}
 		</div>
 	</div>

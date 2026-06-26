@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { ModuleGraph, ModuleNode } from 'vite';
 
 import type { ModuleGraphInfo, ModuleGraphModuleInfo } from '../shared/types.js';
+import { slash } from './files.js';
 
 interface ScanModuleGraphOptions {
 	root: string;
@@ -81,8 +82,4 @@ function sortModules(a: ModuleGraphModuleInfo, b: ModuleGraphModuleInfo) {
 		b.importedModules.length - a.importedModules.length ||
 		a.url.localeCompare(b.url)
 	);
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

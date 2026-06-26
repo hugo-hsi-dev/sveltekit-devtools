@@ -3,13 +3,12 @@
 	import Badge from './Badge.svelte';
 	import TextCard from './TextCard.svelte';
 
-	export let events: LoadEvent[] = [];
-	export let empty = 'No load events found';
+	let { events = [], empty = 'No load events found' }: { events?: LoadEvent[]; empty?: string } =
+		$props();
 
-	$: max = Math.max(1, ...events.map((event) => event.duration));
-	$: maxFetch = Math.max(
-		1,
-		...events.flatMap((event) => (event.fetches ?? []).map((fetch) => fetch.duration)),
+	let max = $derived(Math.max(1, ...events.map((event) => event.duration)));
+	let maxFetch = $derived(
+		Math.max(1, ...events.flatMap((event) => (event.fetches ?? []).map((fetch) => fetch.duration))),
 	);
 
 	function width(duration: number) {
@@ -43,7 +42,7 @@
 </script>
 
 <div class="load-list">
-	{#each events as event}
+	{#each events as event (event.id)}
 		<article class="load-card">
 			<div class="load-summary">
 				<div>
@@ -83,7 +82,7 @@
 						<Badge>{event.fetches.length} requests</Badge>
 					</div>
 					<div class="load-list">
-						{#each event.fetches as fetch}
+						{#each event.fetches as fetch (fetch.id)}
 							<article class="load-card">
 								<div class="load-summary">
 									<div>

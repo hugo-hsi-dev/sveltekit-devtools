@@ -5,6 +5,7 @@ export interface RouteFile {
 	name: string;
 	path: string;
 	server: boolean;
+	layoutReset?: string;
 }
 
 export interface RouteOption {

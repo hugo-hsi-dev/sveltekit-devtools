@@ -1,7 +1,5 @@
 <script lang="ts">
-	export let title: string;
-	export let value: string;
-	export let error = false;
+	let { title, value, error = false }: { title: string; value: string; error?: boolean } = $props();
 </script>
 
 <article class="result-card">

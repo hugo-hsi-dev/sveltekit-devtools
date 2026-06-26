@@ -1,10 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-	componentGraphEdges,
-	filterComponents,
-	routeComponentUsages,
-} from '../src/client/route-components';
+import { componentGraphEdges, routeComponentUsages } from '../src/client/route-components';
 import type { ComponentInfo } from '../src/shared/types';
 
 const base: ComponentInfo = {
@@ -51,12 +47,5 @@ test('finds route component import chain', () => {
 	expect(componentGraphEdges(components).map((edge) => [edge.from.name, edge.to.name])).toEqual([
 		['+page', 'Card'],
 		['Card', 'Button'],
-	]);
-
-	expect(filterComponents(components, 'button').map((component) => component.name)).toEqual([
-		'Button',
-	]);
-	expect(filterComponents(components, '/about').map((component) => component.route)).toEqual([
-		'/about',
 	]);
 });

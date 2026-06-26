@@ -1,14 +1,15 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { RouteFile, RouteFileKind, SvelteKitRoute } from '../shared/types.js';
+import type { RouteChainEntry, RouteFile, RouteFileKind, SvelteKitRoute } from '../shared/types.js';
+import { exists, isInside, slash, walkFiles } from './files.js';
 
 export interface ScanRoutesOptions {
 	routesDir: string;
 	root: string;
 }
 
-const routeFilePattern = /^\+(page|layout|error|server)(\.server)?\.(svelte|js|ts)$/;
+const routeFilePattern = /^\+(page|layout|error|server)(?:@([^.]*))?(\.server)?\.(svelte|js|ts)$/;
 const routeOptionPattern =
 	/\bexport\s+const\s+(prerender|ssr|csr|trailingSlash)\s*(?::[^=]+)?=\s*([^;\n]+)/g;
 const routeChainWrapperKinds = new Set<RouteFileKind>(['layout', 'layout-load', 'error']);
@@ -28,7 +29,7 @@ export async function scanRoutes({
 }: ScanRoutesOptions): Promise<SvelteKitRoute[]> {
 	if (!(await exists(routesDir))) return [];
 
-	const files = await walk(routesDir);
+	const files = await walkFiles(routesDir);
 	const routes = new Map<string, SvelteKitRoute>();
 
 	for (const file of files) {
@@ -55,6 +56,7 @@ export async function scanRoutes({
 			name: path.basename(file),
 			path: slash(path.relative(root, file)),
 			server: meta.server,
+			layoutReset: meta.layoutReset,
 		});
 		route.options.push(
 			...extractRouteOptions(await readFile(file, 'utf-8'), slash(path.relative(root, file))),
@@ -90,21 +92,30 @@ function extractRouteOptions(source: string, file: string) {
 	}));
 }
 
-export function classifyRouteFile(file: string): { kind: RouteFileKind; server: boolean } | null {
+export function classifyRouteFile(
+	file: string,
+): { kind: RouteFileKind; server: boolean; layoutReset?: string } | null {
 	const match = routeFilePattern.exec(file);
 	if (!match) return null;
 
 	const type = match[1];
-	const server = Boolean(match[2]) || type === 'server';
-	const extension = match[3];
+	const layoutReset = match[2];
+	const server = Boolean(match[3]) || type === 'server';
+	const extension = match[4];
 
 	if (type !== 'page' && type !== 'layout' && type !== 'error' && type !== 'server') return null;
 	if (extension !== 'svelte' && extension !== 'js' && extension !== 'ts') return null;
+	if (
+		layoutReset !== undefined &&
+		(type === 'error' || type === 'server' || extension !== 'svelte')
+	) {
+		return null;
+	}
 	if (type === 'error' && (server || extension !== 'svelte')) return null;
 
 	if (type === 'error') return { kind: 'error', server: false };
 	if (type === 'server') return { kind: 'endpoint', server: true };
-	if (extension === 'svelte') return { kind: type, server: false };
+	if (extension === 'svelte') return { kind: type, server: false, layoutReset };
 	return { kind: `${type}-load` as RouteFileKind, server };
 }
 
@@ -151,21 +162,54 @@ function isPathlessGroup(segment: string) {
 }
 
 function routeChain(id: string, routes: Map<string, SvelteKitRoute>) {
-	return routeAncestors(id).flatMap((ownerId) => {
-		const route = routes.get(ownerId);
-		if (!route) return [];
+	const ancestors = routeAncestors(id);
+	const route = routes.get(id);
+	const leafFiles =
+		route?.files
+			.filter((file) => routeChainLeafKinds.has(file.kind))
+			.sort(compareRouteFilesByChain) ?? [];
+	const leafReset = leafFiles.find((file) => file.layoutReset !== undefined)?.layoutReset;
+	const wrappers =
+		leafReset === undefined
+			? routeWrappers(ancestors, ancestors.length - 1, routes, id)
+			: routeWrappers(resetAncestors(ancestors, id, leafReset), ancestors.length - 1, routes, id);
+	const leafEntries = leafFiles.map((file) => ({
+		...file,
+		route: route?.path ?? routePathFromId(id),
+		inherited: false,
+	}));
 
-		const allowed =
-			ownerId === id ? [routeChainWrapperKinds, routeChainLeafKinds] : [routeChainWrapperKinds];
-		return route.files
-			.filter((file) => allowed.some((kinds) => kinds.has(file.kind)))
-			.sort(compareRouteFilesByChain)
-			.map((file) => ({
+	return [...wrappers, ...leafEntries];
+}
+
+function routeWrappers(
+	ancestors: string[],
+	lastIndex: number,
+	routes: Map<string, SvelteKitRoute>,
+	activeId: string,
+) {
+	let entries: Array<RouteChainEntry & { ownerId: string }> = [];
+
+	for (const ownerId of ancestors.slice(0, lastIndex + 1)) {
+		const route = routes.get(ownerId);
+		if (!route) continue;
+
+		for (const file of route.files
+			.filter((item) => routeChainWrapperKinds.has(item.kind))
+			.sort(compareRouteFilesByChain)) {
+			if (file.layoutReset !== undefined) {
+				entries = trimRouteChain(entries, ancestors, ownerId, file.layoutReset);
+			}
+			entries.push({
 				...file,
+				ownerId,
 				route: route.path,
-				inherited: ownerId !== id,
-			}));
-	});
+				inherited: ownerId !== activeId,
+			});
+		}
+	}
+
+	return entries.map(({ ownerId: _ownerId, ...entry }) => entry);
 }
 
 function routeAncestors(id: string) {
@@ -174,38 +218,36 @@ function routeAncestors(id: string) {
 	return ['/', ...parts.map((_, index) => `/${parts.slice(0, index + 1).join('/')}`)];
 }
 
+function trimRouteChain<T extends { ownerId: string }>(
+	entries: T[],
+	ancestors: string[],
+	ownerId: string,
+	reset: string,
+) {
+	const target = resetAncestorIndex(ancestors, ownerId, reset);
+	if (target < 0) return entries;
+	const allowed = new Set(ancestors.slice(0, target + 1));
+	return entries.filter((entry) => allowed.has(entry.ownerId));
+}
+
+function resetAncestorIndex(ancestors: string[], ownerId: string, reset: string) {
+	if (reset === '') return 0;
+	const start = ancestors.indexOf(ownerId);
+	for (let index = start; index >= 0; index -= 1) {
+		const segment = ancestors[index]?.split('/').filter(Boolean).at(-1);
+		if (segment === reset) return index;
+	}
+	return -1;
+}
+
+function resetAncestors(ancestors: string[], ownerId: string, reset: string) {
+	const target = resetAncestorIndex(ancestors, ownerId, reset);
+	return target < 0 ? ancestors : ancestors.slice(0, target + 1);
+}
+
 function compareRouteFilesByChain(a: RouteFile, b: RouteFile) {
 	return (
 		(routeChainKindOrder.get(a.kind) ?? 99) - (routeChainKindOrder.get(b.kind) ?? 99) ||
 		a.name.localeCompare(b.name)
 	);
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function isInside(parent: string, child: string) {
-	const relative = path.relative(parent, child);
-	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

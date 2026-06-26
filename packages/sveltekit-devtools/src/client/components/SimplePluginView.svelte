@@ -4,7 +4,7 @@
 	import Panel from './Panel.svelte';
 	import PluginCard from './PluginCard.svelte';
 
-	export let plugins: VitePluginInfo[] = [];
+	let { plugins = [] }: { plugins?: VitePluginInfo[] } = $props();
 	const groups: VitePluginInfo['enforce'][] = ['pre', 'normal', 'post'];
 </script>
 
@@ -16,12 +16,12 @@
 	<Badge>{plugins.length} plugins</Badge>
 </div>
 
-{#each groups as enforce}
+{#each groups as enforce (enforce)}
 	{@const group = plugins.filter((plugin) => plugin.enforce === enforce)}
 	{#if group.length}
 		<Panel title={enforce} detail={`${group.length} plugins`}>
 			<div class="detail-grid">
-				{#each group as plugin}
+				{#each group as plugin (plugin.name)}
 					<PluginCard {plugin} />
 				{/each}
 			</div>

@@ -2,9 +2,9 @@
 	import type { TaskRunEvent } from '../../shared/types';
 	import Badge from './Badge.svelte';
 
-	export let run: TaskRunEvent;
-	$: text = run.error ?? run.output ?? '';
-	$: running = run.status === 'running';
+	let { run }: { run: TaskRunEvent } = $props();
+	let text = $derived(run.error ?? run.output ?? '');
+	let running = $derived(run.status === 'running');
 </script>
 
 <article class="load-card">

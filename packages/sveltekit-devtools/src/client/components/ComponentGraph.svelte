@@ -1,35 +1,51 @@
 <script lang="ts">
 	import { onDestroy, tick } from 'svelte';
-	import { DataSet } from 'vis-data/peer';
-	import { Network } from 'vis-network/peer';
 
 	import type { ComponentInfo } from '../../shared/types';
 	import { componentGraphData } from '../component-graph';
 
-	export let components: ComponentInfo[] = [];
-	export let selectedFile = '';
-	export let onSelect: (file: string) => void = () => {};
+	type NetworkInstance = import('vis-network/peer').Network;
 
-	let container: HTMLDivElement;
-	let network: Network | null = null;
+	let {
+		components = [],
+		selectedFile = '',
+		onSelect = () => {},
+	}: {
+		components?: ComponentInfo[];
+		selectedFile?: string;
+		onSelect?: (file: string) => void;
+	} = $props();
+
+	let container = $state<HTMLDivElement>();
+	let network: NetworkInstance | null = null;
 	let lastKey = '';
+	let renderToken = 0;
+	let destroyed = false;
 
-	$: graph = componentGraphData(components);
-	$: {
+	let graph = $derived(componentGraphData(components));
+	$effect(() => {
 		const key = JSON.stringify([graph.nodes, graph.edges, selectedFile]);
-		if (container && key !== lastKey) {
+		if (!destroyed && container && key !== lastKey) {
 			lastKey = key;
-			void renderGraph();
+			void renderGraph(++renderToken);
 		}
-	}
-
-	onDestroy(() => {
-		network?.destroy();
 	});
 
-	async function renderGraph() {
+	onDestroy(() => {
+		destroyed = true;
+		renderToken += 1;
+		network?.destroy();
+		network = null;
+	});
+
+	async function renderGraph(token: number) {
 		await tick();
-		if (!container) return;
+		if (destroyed || token !== renderToken || !container) return;
+		const [{ DataSet }, { Network }] = await Promise.all([
+			import('vis-data/peer'),
+			import('vis-network/peer'),
+		]);
+		if (destroyed || token !== renderToken || !container) return;
 		network?.destroy();
 		network = new Network(
 			container,

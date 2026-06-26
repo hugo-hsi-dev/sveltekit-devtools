@@ -3,8 +3,7 @@
 	import Badge from './Badge.svelte';
 	import LoadRows from './LoadRows.svelte';
 
-	export let title: string;
-	export let events: LoadEvent[] = [];
+	let { title, events = [] }: { title: string; events?: LoadEvent[] } = $props();
 </script>
 
 <section class="remote-calls">

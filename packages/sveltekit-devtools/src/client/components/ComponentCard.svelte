@@ -3,17 +3,20 @@
 	import Badge from './Badge.svelte';
 	import MetaRow from './MetaRow.svelte';
 
-	export let component: ComponentInfo;
-	export let onOpen: (file: string) => void = () => {};
+	let {
+		component,
+		onOpen = () => {},
+	}: { component: ComponentInfo; onOpen?: (file: string) => void } = $props();
 
-	$: blocks =
+	let blocks = $derived(
 		[
 			component.hasModuleScript ? 'module script' : '',
 			component.hasInstanceScript ? 'instance script' : '',
 			component.hasStyle ? 'style' : '',
 		]
 			.filter(Boolean)
-			.join(', ') || 'markup only';
+			.join(', ') || 'markup only',
+	);
 </script>
 
 <article class="result-card">
@@ -24,7 +27,7 @@
 		</div>
 		<Badge tone={component.kind === 'route' ? 'hot' : 'default'}>{component.kind}</Badge>
 	</div>
-	<button type="button" on:click={() => onOpen(component.file)}>Open file</button>
+	<button type="button" onclick={() => onOpen(component.file)}>Open file</button>
 	<div class="meta-list">
 		<MetaRow label="Route" value={component.route ?? '-'} />
 		<MetaRow label="Props" value={component.props.join(', ') || 'none'} />

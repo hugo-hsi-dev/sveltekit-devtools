@@ -1,3 +1,5 @@
+<svelte:options runes={true} />
+
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
@@ -122,100 +124,114 @@
 	];
 	const configurableViewSet = new Set<string>(configurableViews);
 
-	let state: DevtoolsState = emptyState();
-	let view: View = 'overview';
-	let status = { text: 'Connecting', tone: '' };
-	let loading = true;
+	let devtools = $state.raw<DevtoolsState>(emptyState());
+	let view = $state<View>('overview');
+	let status = $state({ text: 'Connecting', tone: '' });
+	let loading = $state(true);
 	let rpcPromise: Promise<any | null> | undefined;
-	let settings = loadSettings();
-	let hostTheme: 'dark' | 'light' | null = null;
-	let currentRoute = '';
+	let settings = $state.raw(loadSettings());
+	let hostTheme = $state<'dark' | 'light' | null>(null);
+	let currentRoute = $state('');
 	let pauseAutoRefreshUntil = 0;
 
-	let selectedRoute = '';
-	let routeQuery = '';
-	let routeInput = '/';
-	let routeParamInputs: Record<string, Record<string, string>> = {};
+	let selectedRoute = $state('');
+	let routeQuery = $state('');
+	let routeInput = $state('/');
+	let routeParamInputs = $state.raw<Record<string, Record<string, string>>>({});
 
-	let importQuery = '';
-	let importKind: ImportFilterKind = 'all';
-	let assetQuery = '';
-	let assetExtension = 'all';
-	let selectedAssetId = '';
-	let componentQuery = '';
-	let selectedComponentFile = '';
+	let importQuery = $state('');
+	let importKind = $state<ImportFilterKind>('all');
+	let assetQuery = $state('');
+	let assetExtension = $state('all');
+	let selectedAssetId = $state('');
+	let componentQuery = $state('');
+	let selectedComponentFile = $state('');
 
-	let remoteInputs: Record<string, string> = {};
-	let remoteResults: Record<string, { status: RemoteRunState; text: string }> = {};
-	let runningTasks: Record<string, boolean> = {};
-	let serverRouteBodies: Record<string, string> = {};
-	let serverRouteHeaders: Record<string, string> = {};
-	let serverRouteMethods: Record<string, HttpMethod> = {};
-	let serverRoutePaths: Record<string, string> = {};
-	let serverRouteResults: Record<string, ServerRouteResult> = {};
-	let actionInputs: Record<string, string> = {};
-	let actionResults: Record<string, ActionResult> = {};
+	let remoteInputs = $state.raw<Record<string, string>>({});
+	let remoteResults = $state.raw<Record<string, { status: RemoteRunState; text: string }>>({});
+	let runningTasks = $state.raw<Record<string, boolean>>({});
+	let serverRouteBodies = $state.raw<Record<string, string>>({});
+	let serverRouteHeaders = $state.raw<Record<string, string>>({});
+	let serverRouteMethods = $state.raw<Record<string, HttpMethod>>({});
+	let serverRoutePaths = $state.raw<Record<string, string>>({});
+	let serverRouteResults = $state.raw<Record<string, ServerRouteResult>>({});
+	let actionInputs = $state.raw<Record<string, string>>({});
+	let actionResults = $state.raw<Record<string, ActionResult>>({});
 
-	let timelineKind = 'all';
-	let timelineRecording = true;
-	let timelineSnapshot: TimelineEvent[] | null = null;
+	let timelineKind = $state('all');
+	let timelineRecording = $state(true);
+	let timelineSnapshot = $state.raw<TimelineEvent[] | null>(null);
 
-	let seoRouteInput = '/';
-	let seoMeta: SeoMeta | null = null;
-	let seoStatus: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
-	let seoError = '';
-	let pendingSeoRoute = '';
+	let seoRouteInput = $state('/');
+	let seoMeta = $state.raw<SeoMeta | null>(null);
+	let seoStatus = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
+	let seoError = $state('');
+	let pendingSeoRoute = $state('');
 
-	let paletteOpen = false;
-	let paletteQuery = '';
-	let paletteIndex = 0;
-	let paletteInput: HTMLInputElement;
+	let paletteOpen = $state(false);
+	let paletteQuery = $state('');
+	let paletteIndex = $state(0);
+	let paletteInput = $state<HTMLInputElement>();
 
-	$: routeList = searchItems(state.routes, routeQuery, ['path', 'id']);
-	$: selectedRouteData =
-		state.routes.find((route) => route.id === selectedRoute) ?? state.routes[0] ?? null;
-	$: pinnedViews = settings.pinnedViews.filter(isConfigurableView);
-	$: routeMatches = matchedRoutes(state.routes, stripAppBase(routeInput || currentRoute || '/'));
-	$: importCounts = importKindCounts(state.imports);
-	$: importsByFilter = filterImports(state.imports, { kind: importKind });
-	$: visibleImports = searchItems(importsByFilter, importQuery, [
-		'specifier',
-		'kind',
-		'importedBy',
-	]);
-	$: assetExtensionOptions = assetExtensions(state.assets);
-	$: visibleAssets = searchItems(
-		filterAssets(state.assets, { extension: assetExtension }),
-		assetQuery,
-		['path', 'url', 'type', 'preview'],
+	let routeList = $derived(searchItems(devtools.routes, routeQuery, ['path', 'id']));
+	let selectedRouteData = $derived(
+		devtools.routes.find((route) => route.id === selectedRoute) ?? devtools.routes[0] ?? null,
 	);
-	$: selectedAsset = state.assets.find((asset) => asset.id === selectedAssetId) ?? null;
-	$: visibleComponents = searchItems(state.components, componentQuery, [
-		'name',
-		'file',
-		'kind',
-		'route',
-		'props',
-	]);
-	$: selectedComponent =
-		state.components.find((component) => component.file === selectedComponentFile) ??
-		visibleComponents[0] ??
-		null;
-	$: timelineSource = timelineRecording ? timelineEvents(state) : (timelineSnapshot ?? []);
-	$: timelineKinds = [...new Set(timelineSource.map((event) => event.kind))];
-	$: timelineRows =
+	let pinnedViews = $derived(settings.pinnedViews.filter(isConfigurableView));
+	let routeMatches = $derived(
+		matchedRoutes(devtools.routes, stripAppBase(routeInput || currentRoute || '/')),
+	);
+	let importCounts = $derived(importKindCounts(devtools.imports));
+	let importsByFilter = $derived(filterImports(devtools.imports, { kind: importKind }));
+	let visibleImports = $derived(
+		searchItems(importsByFilter, importQuery, ['specifier', 'kind', 'importedBy']),
+	);
+	let assetExtensionOptions = $derived(assetExtensions(devtools.assets));
+	let visibleAssets = $derived(
+		searchItems(filterAssets(devtools.assets, { extension: assetExtension }), assetQuery, [
+			'path',
+			'url',
+			'type',
+			'preview',
+		]),
+	);
+	let selectedAsset = $derived(
+		devtools.assets.find((asset) => asset.id === selectedAssetId) ?? null,
+	);
+	let visibleComponents = $derived(
+		searchItems(devtools.components, componentQuery, ['name', 'file', 'kind', 'route', 'props']),
+	);
+	let selectedComponent = $derived(
+		devtools.components.find((component) => component.file === selectedComponentFile) ??
+			visibleComponents[0] ??
+			null,
+	);
+	let timelineSource = $derived(
+		timelineRecording ? timelineEvents(devtools) : (timelineSnapshot ?? []),
+	);
+	let timelineKinds = $derived([...new Set(timelineSource.map((event) => event.kind))]);
+	let timelineRows = $derived(
 		timelineKind === 'all'
 			? timelineSource
-			: timelineSource.filter((event) => event.kind === timelineKind);
-	$: timelineMax = Math.max(1, ...timelineRows.map((event) => event.duration));
-	$: hookMax = Math.max(1, ...state.hookEvents.map((event) => event.duration));
-	$: analysis = state.buildAnalysis;
-	$: graph = state.moduleGraph;
-	$: commandItems = buildCommandItems();
-	$: paletteResults = searchItems(commandItems, paletteQuery, ['label', 'group']).slice(0, 40);
-	$: if (paletteIndex >= paletteResults.length) paletteIndex = 0;
-	$: applySettings();
-	$: if (paletteOpen) void focusPalette();
+			: timelineSource.filter((event) => event.kind === timelineKind),
+	);
+	let timelineMax = $derived(Math.max(1, ...timelineRows.map((event) => event.duration)));
+	let hookMax = $derived(Math.max(1, ...devtools.hookEvents.map((event) => event.duration)));
+	let analysis = $derived(devtools.buildAnalysis);
+	let graph = $derived(devtools.moduleGraph);
+	let commandItems = $derived(buildCommandItems());
+	let paletteResults = $derived(
+		searchItems(commandItems, paletteQuery, ['label', 'group']).slice(0, 40),
+	);
+	$effect(() => {
+		if (paletteIndex >= paletteResults.length) paletteIndex = 0;
+	});
+	$effect(() => {
+		applySettings();
+	});
+	$effect(() => {
+		if (paletteOpen) void focusPalette();
+	});
 
 	onMount(() => {
 		const initialHash = location.hash.slice(1) as View;
@@ -267,10 +283,18 @@
 			setStatus('Loading', '');
 		}
 		try {
-			state = await readState();
-			selectedRoute ||= state.routes[0]?.id ?? '';
+			devtools = await readState();
+			selectedRoute ||= devtools.routes[0]?.id ?? '';
+			const selected =
+				devtools.routes.find((route) => route.id === selectedRoute) ?? devtools.routes[0];
+			selectedRoute = selected?.id ?? '';
+			if (selected) ensureRouteParamValues(selected);
 			if (!routeInput || routeInput === '/') {
-				routeInput = withAppBase(currentRoute || state.routes[0]?.path || '/');
+				routeInput = currentRoute
+					? withAppBase(currentRoute)
+					: selected
+						? routeOpenPath(selected)
+						: '/';
 			}
 			if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = withAppBase(currentRoute || '/');
 			setStatus('Live', 'live');
@@ -339,7 +363,7 @@
 			...allViews
 				.filter((item) => canUseView(item))
 				.map((item) => ({ id: `view:${item}`, label: viewLabels[item], group: 'View' })),
-			...state.routes.map((route) => ({
+			...devtools.routes.map((route) => ({
 				id: `route:${route.id}`,
 				label: route.path,
 				group: 'Route',
@@ -359,7 +383,7 @@
 			return;
 		}
 		if (id.startsWith('route:')) {
-			const route = state.routes.find((item) => item.id === id.slice('route:'.length));
+			const route = devtools.routes.find((item) => item.id === id.slice('route:'.length));
 			if (route) selectRoute(route);
 			return;
 		}
@@ -376,6 +400,7 @@
 	}
 
 	function selectRoute(route: SvelteKitRoute) {
+		ensureRouteParamValues(route);
 		selectedRoute = route.id;
 		routeInput = routeOpenPath(route);
 		setView('routes');
@@ -386,16 +411,19 @@
 	}
 
 	function routeParamValues(route: SvelteKitRoute) {
-		const existing = routeParamInputs[route.id];
-		if (existing) return existing;
+		return routeParamInputs[route.id] ?? {};
+	}
+
+	function ensureRouteParamValues(route: SvelteKitRoute) {
+		if (routeParamInputs[route.id]) return;
 		const values = Object.fromEntries(
 			routePathParams(route.path).map((param) => [param.name, defaultRouteParamValue(param)]),
 		);
 		routeParamInputs = { ...routeParamInputs, [route.id]: values };
-		return values;
 	}
 
 	function setRouteParam(route: SvelteKitRoute, param: RoutePathParam, value: string) {
+		ensureRouteParamValues(route);
 		routeParamInputs = {
 			...routeParamInputs,
 			[route.id]: { ...routeParamValues(route), [param.name]: value },
@@ -509,13 +537,13 @@
 	}
 
 	async function runBuildAnalyze() {
-		state = {
-			...state,
+		devtools = {
+			...devtools,
 			buildAnalysis: { status: 'running', startedAt: Date.now(), totalSize: 0, assets: [] },
 		};
 		const response = await fetch(api('build-analyze'), { method: 'POST' });
 		if (!response.ok) throw new Error('Build analyze failed');
-		state = { ...state, buildAnalysis: (await response.json()) as BuildAnalysis };
+		devtools = { ...devtools, buildAnalysis: (await response.json()) as BuildAnalysis };
 	}
 
 	async function runTask(task: TaskScriptInfo) {
@@ -527,14 +555,14 @@
 				body: JSON.stringify({ name: task.name }),
 			});
 			const result = (await response.json()) as TaskRunEvent;
-			state = {
-				...state,
-				taskRuns: [result, ...state.taskRuns.filter((run) => run.id !== result.id)],
+			devtools = {
+				...devtools,
+				taskRuns: [result, ...devtools.taskRuns.filter((run) => run.id !== result.id)],
 			};
 		} catch (error) {
 			const startedAt = Date.now();
-			state = {
-				...state,
+			devtools = {
+				...devtools,
 				taskRuns: [
 					{
 						id: `${startedAt}:${task.name}`,
@@ -546,7 +574,7 @@
 						duration: 0,
 						error: errorMessage(error),
 					},
-					...state.taskRuns,
+					...devtools.taskRuns,
 				],
 			};
 		} finally {
@@ -745,7 +773,7 @@
 
 	async function openSourceFile(file: string, line?: number, column?: number) {
 		if (!file) return;
-		const target = file.startsWith('/') ? file : `${state.root}/${file}`;
+		const target = file.startsWith('/') ? file : `${devtools.root}/${file}`;
 		const positioned = line ? `${target}:${line}${column ? `:${column}` : ''}` : target;
 		try {
 			const rpc = await rpcClient();
@@ -906,7 +934,7 @@
 	}
 
 	function appBase() {
-		const base = state.runtimeConfig.base || '/';
+		const base = devtools.runtimeConfig.base || '/';
 		if (base === '/') return '';
 		return `/${base.replace(/^\/|\/$/g, '')}`;
 	}
@@ -927,11 +955,11 @@
 	}
 
 	function latestLoad(route: SvelteKitRoute) {
-		return routeLoadEvents(state.loads, route)[0];
+		return routeLoadEvents(devtools.loads, route)[0];
 	}
 
 	function loadFetchCount() {
-		return state.loads.reduce((count, event) => count + (event.fetches?.length ?? 0), 0);
+		return devtools.loads.reduce((count, event) => count + (event.fetches?.length ?? 0), 0);
 	}
 
 	function formatBytes(bytes: number) {
@@ -1018,7 +1046,7 @@
 	}
 </script>
 
-<svelte:window on:message={handleHostMessage} on:keydown={handleKeydown} />
+<svelte:window onmessage={handleHostMessage} onkeydown={handleKeydown} />
 
 <div
 	class="devtools-shell"
@@ -1032,7 +1060,7 @@
 			class:active={view === 'overview'}
 			type="button"
 			title="Overview"
-			on:click={() => setView('overview')}
+			onclick={() => setView('overview')}
 		>
 			<span class="sidebar-icon">{@html icons.overview}</span>
 			<span class="sidebar-label">Overview</span>
@@ -1041,13 +1069,13 @@
 		{#if settings.pinnedViews.length}
 			<div class="sidebar-category">
 				<span>Pinned</span>
-				{#each pinnedViews.filter((item) => isViewVisible(settings, item)) as item}
+				{#each pinnedViews.filter((item) => isViewVisible(settings, item)) as item (item)}
 					<button
 						class="sidebar-row"
 						class:active={view === item}
 						type="button"
 						title={viewLabels[item]}
-						on:click={() => setView(item)}
+						onclick={() => setView(item)}
 					>
 						<span class="sidebar-icon">{@html icons[viewIcons[item]]}</span>
 						<span class="sidebar-label">{viewLabels[item]}</span>
@@ -1056,17 +1084,17 @@
 			</div>
 		{/if}
 
-		{#each navCategories as category}
+		{#each navCategories as category (category.id)}
 			{#if isCategoryVisible(settings, category.id)}
 				<div class="sidebar-category">
 					<span>{category.label}</span>
-					{#each categoryViews(category) as item}
+					{#each categoryViews(category) as item (item)}
 						<button
 							class="sidebar-row"
 							class:active={view === item}
 							type="button"
 							title={viewLabels[item]}
-							on:click={() => setView(item)}
+							onclick={() => setView(item)}
 						>
 							<span class="sidebar-icon">{@html icons[viewIcons[item]]}</span>
 							<span class="sidebar-label">{viewLabels[item]}</span>
@@ -1081,7 +1109,7 @@
 			class="sidebar-row"
 			type="button"
 			title={settings.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-			on:click={() => updateSettings({ sidebarExpanded: !settings.sidebarExpanded })}
+			onclick={() => updateSettings({ sidebarExpanded: !settings.sidebarExpanded })}
 		>
 			<span class="sidebar-icon">⇤</span>
 			<span class="sidebar-label">Collapse</span>
@@ -1091,7 +1119,7 @@
 			class:active={view === 'settings'}
 			type="button"
 			title="Settings"
-			on:click={() => setView('settings')}
+			onclick={() => setView('settings')}
 		>
 			<span class="sidebar-icon">{@html icons.settings}</span>
 			<span class="sidebar-label">Settings</span>
@@ -1104,22 +1132,22 @@
 				<span>{@html icons[viewIcons[view]]}</span>
 				<div>
 					<h1>{viewLabels[view]}</h1>
-					<p class="muted">{state.project.name || state.root || 'SvelteKit app'}</p>
+					<p class="muted">{devtools.project.name || devtools.root || 'SvelteKit app'}</p>
 				</div>
 			</div>
 			<div class="actions">
 				<span class="status {status.tone}">{status.text}</span>
-				<button type="button" on:click={() => (paletteOpen = true)}>Commands</button>
-				<button class="icon-button" type="button" title="Refresh" on:click={() => refresh()}
+				<button type="button" onclick={() => (paletteOpen = true)}>Commands</button>
+				<button class="icon-button" type="button" title="Refresh" onclick={() => refresh()}
 					>↻</button
 				>
 				{#if view === 'loads'}
-					<button type="button" on:click={clearLoads}>Clear loads</button>
+					<button type="button" onclick={clearLoads}>Clear loads</button>
 				{/if}
 			</div>
 		</header>
 
-		{#if loading && !state.generatedAt}
+		{#if loading && !devtools.generatedAt}
 			<div class="view"><Loading>Loading devtools state</Loading></div>
 		{:else}
 			{#key view}
@@ -1127,10 +1155,10 @@
 					{#if view === 'overview'}
 						<div class="section-head">
 							<div>
-								<h2>{state.project.name || 'Project'}</h2>
-								<p class="muted">{state.root}</p>
+								<h2>{devtools.project.name || 'Project'}</h2>
+								<p class="muted">{devtools.root}</p>
 							</div>
-							<Badge>{state.project.version || 'dev'}</Badge>
+							<Badge>{devtools.project.version || 'dev'}</Badge>
 						</div>
 						<div class="detail-grid">
 							<article class="result-card">
@@ -1138,25 +1166,28 @@
 								<div class="meta-list">
 									<MetaRow
 										label="Package manager"
-										value={state.project.packageManager || 'unknown'}
+										value={devtools.project.packageManager || 'unknown'}
 									/>
-									<MetaRow label="Routes" value={String(state.routes.length)} />
+									<MetaRow label="Routes" value={String(devtools.routes.length)} />
 									<MetaRow label="Load fetches" value={String(loadFetchCount())} />
-									<MetaRow label="Hooks" value={String(state.hooks.length)} />
-									<MetaRow label="Components" value={String(state.components.length)} />
-									<MetaRow label="Imports" value={String(state.imports.length)} />
-									<MetaRow label="Assets" value={String(state.assets.length)} />
-									<MetaRow label="Server routes" value={String(state.serverRoutes.length)} />
-									<MetaRow label="Actions" value={String(state.routeActions.length)} />
-									<MetaRow label="Remotes" value={String(state.remotes.length)} />
-									<MetaRow label="Virtual files" value={String(state.virtualFiles.length)} />
-									<MetaRow label="Build size" value={formatBytes(state.buildAnalysis.totalSize)} />
+									<MetaRow label="Hooks" value={String(devtools.hooks.length)} />
+									<MetaRow label="Components" value={String(devtools.components.length)} />
+									<MetaRow label="Imports" value={String(devtools.imports.length)} />
+									<MetaRow label="Assets" value={String(devtools.assets.length)} />
+									<MetaRow label="Server routes" value={String(devtools.serverRoutes.length)} />
+									<MetaRow label="Actions" value={String(devtools.routeActions.length)} />
+									<MetaRow label="Remotes" value={String(devtools.remotes.length)} />
+									<MetaRow label="Virtual files" value={String(devtools.virtualFiles.length)} />
+									<MetaRow
+										label="Build size"
+										value={formatBytes(devtools.buildAnalysis.totalSize)}
+									/>
 								</div>
 							</article>
 							<article class="result-card">
 								<h3>Core packages</h3>
 								<div class="meta-list">
-									{#each state.project.dependencies.filter( (dep) => ['@sveltejs/kit', 'svelte', 'vite', 'sveltekit-devtools'].includes(dep.name), ) as dep}
+									{#each devtools.project.dependencies.filter( (dep) => ['@sveltejs/kit', 'svelte', 'vite', 'sveltekit-devtools'].includes(dep.name), ) as dep (dep.name)}
 										<MetaRow label={dep.name} value={`${dep.version} · ${dep.type}`} />
 									{:else}
 										<div class="empty small">No SvelteKit packages found</div>
@@ -1165,11 +1196,10 @@
 							</article>
 						</div>
 						<Panel title="Vite plugins" detail="Plugins active in this dev server">
-							<svelte:fragment slot="meta"
-								><Badge>{state.project.vitePlugins.length} plugins</Badge></svelte:fragment
-							>
+							{#snippet meta()}<Badge>{devtools.project.vitePlugins.length} plugins</Badge
+								>{/snippet}
 							<div class="detail-grid">
-								{#each state.project.vitePlugins.slice(0, 24) as plugin}
+								{#each devtools.project.vitePlugins.slice(0, 24) as plugin (`${plugin.name}:${plugin.enforce}:${plugin.apply}`)}
 									<PluginCard {plugin} />
 								{:else}
 									<div class="empty">No Vite plugins found</div>
@@ -1189,14 +1219,14 @@
 									/>
 								</label>
 								<div class="routes-list">
-									{#each routeList as route}
+									{#each routeList as route (route.id)}
 										{@const latest = latestLoad(route)}
 										<button
 											class="route-row"
 											class:active={selectedRouteData?.id === route.id}
 											class:current={routeIsCurrent(route)}
 											type="button"
-											on:click={() => selectRoute(route)}
+											onclick={() => selectRoute(route)}
 										>
 											<span class="route-path">
 												{#if routeIsCurrent(route)}<span class="route-dot"></span>{/if}{route.path}
@@ -1223,9 +1253,9 @@
 										bind:value={routeInput}
 										type="text"
 										aria-label="Route input"
-										on:keydown={(event) => event.key === 'Enter' && openRoute(routeInput)}
+										onkeydown={(event) => event.key === 'Enter' && openRoute(routeInput)}
 									/>
-									<button type="button" on:click={() => openRoute(routeInput)}>Open route</button>
+									<button type="button" onclick={() => openRoute(routeInput)}>Open route</button>
 								</div>
 								<div class="detail-grid">
 									<article class="result-card">
@@ -1248,7 +1278,7 @@
 									<article class="result-card">
 										<h3>All routes</h3>
 										<div class="meta-list">
-											{#each routeMatches as route}
+											{#each routeMatches as route (route.id)}
 												<MetaRow label={route.path} value={`${route.files.length} files`} />
 											{:else}
 												<div class="empty small">No matching route</div>
@@ -1260,9 +1290,9 @@
 								{#if selectedRouteData}
 									{@const params = routePathParams(selectedRouteData.path)}
 									{@const values = routeParamValues(selectedRouteData)}
-									{@const loads = routeLoadEvents(state.loads, selectedRouteData)}
+									{@const loads = routeLoadEvents(devtools.loads, selectedRouteData)}
 									{@const components = routeComponentUsages(
-										state.components,
+										devtools.components,
 										selectedRouteData.path,
 									)}
 									<article class="route-detail">
@@ -1274,12 +1304,12 @@
 										</p>
 										{#if params.length}
 											<div class="route-params">
-												{#each params as param}
+												{#each params as param (param.name)}
 													<label>
 														<span>{param.name} <em>{param.type}</em></span>
 														<input
 															value={values[param.name] ?? ''}
-															on:input={(event) =>
+															oninput={(event) =>
 																setRouteParam(selectedRouteData, param, event.currentTarget.value)}
 														/>
 													</label>
@@ -1287,7 +1317,7 @@
 											</div>
 										{/if}
 										<div class="file-grid">
-											{#each selectedRouteData.files as file}
+											{#each selectedRouteData.files as file (file.path)}
 												<FileCard
 													file={file.path}
 													title={file.name}
@@ -1302,11 +1332,10 @@
 												title="Route chain"
 												detail="Layouts, error boundaries, and leaf files used for this route"
 											>
-												<svelte:fragment slot="meta"
-													><Badge>{selectedRouteData.chain.length} files</Badge></svelte:fragment
-												>
+												{#snippet meta()}<Badge>{selectedRouteData.chain.length} files</Badge
+													>{/snippet}
 												<div class="component-chain">
-													{#each selectedRouteData.chain as file, index}
+													{#each selectedRouteData.chain as file, index (file.path)}
 														<div class="component-chain-row" style={`margin-left:${index * 12}px`}>
 															<div>
 																<strong>{file.name}</strong>
@@ -1317,7 +1346,7 @@
 																</p>
 															</div>
 															<Badge tone={file.inherited ? 'default' : 'hot'}>{file.kind}</Badge>
-															<button type="button" on:click={() => openSourceFile(file.path)}
+															<button type="button" onclick={() => openSourceFile(file.path)}
 																>Open file</button
 															>
 														</div>
@@ -1330,11 +1359,9 @@
 												title="Components used by route"
 												detail="Route Svelte files and local component imports"
 											>
-												<svelte:fragment slot="meta"
-													><Badge>{components.length} components</Badge></svelte:fragment
-												>
+												{#snippet meta()}<Badge>{components.length} components</Badge>{/snippet}
 												<div class="component-chain">
-													{#each components as usage}
+													{#each components as usage (usage.component.file)}
 														<div
 															class="component-chain-row"
 															style={`margin-left:${usage.depth * 18}px`}
@@ -1348,7 +1375,7 @@
 															>
 															<button
 																type="button"
-																on:click={() => openSourceFile(usage.component.file)}
+																onclick={() => openSourceFile(usage.component.file)}
 																>Open file</button
 															>
 														</div>
@@ -1371,9 +1398,9 @@
 								<h2>Load data</h2>
 								<p class="muted">Recent load calls from page and layout modules.</p>
 							</div>
-							<Badge>{state.loads.length} events</Badge>
+							<Badge>{devtools.loads.length} events</Badge>
 						</div>
-						<LoadRows events={state.loads} empty="Visit routes to collect load data" />
+						<LoadRows events={devtools.loads} empty="Visit routes to collect load data" />
 					{:else if view === 'timeline'}
 						<div class="section-head">
 							<div>
@@ -1383,13 +1410,13 @@
 							<div class="timeline-controls">
 								<select bind:value={timelineKind}>
 									<option value="all">All kinds</option>
-									{#each timelineKinds as kind}<option value={kind}>{kind}</option>{/each}
+									{#each timelineKinds as kind (kind)}<option value={kind}>{kind}</option>{/each}
 								</select>
 								<button
 									type="button"
-									on:click={() => {
+									onclick={() => {
 										timelineRecording = !timelineRecording;
-										timelineSnapshot = timelineRecording ? null : timelineEvents(state);
+										timelineSnapshot = timelineRecording ? null : timelineEvents(devtools);
 									}}
 								>
 									{timelineRecording ? 'Pause' : 'Record'}
@@ -1398,7 +1425,7 @@
 							</div>
 						</div>
 						<div class="load-list">
-							{#each timelineRows as event}
+							{#each timelineRows as event (event.id)}
 								<article class="load-card">
 									<div class="load-summary">
 										<div>
@@ -1434,10 +1461,10 @@
 								<h2>Hooks</h2>
 								<p class="muted">SvelteKit server, client, and universal hooks.</p>
 							</div>
-							<Badge>{state.hooks.length} hooks · {state.hookEvents.length} calls</Badge>
+							<Badge>{devtools.hooks.length} hooks · {devtools.hookEvents.length} calls</Badge>
 						</div>
 						<div class="detail-grid">
-							{#each state.hooks as hook}
+							{#each devtools.hooks as hook (hook.id)}
 								<article class="result-card">
 									<div class="section-head compact">
 										<div>
@@ -1446,8 +1473,7 @@
 										</div>
 										<Badge tone={hook.instrumented ? 'hot' : 'default'}>{hook.environment}</Badge>
 									</div>
-									<button type="button" on:click={() => openSourceFile(hook.file)}>Open file</button
-									>
+									<button type="button" onclick={() => openSourceFile(hook.file)}>Open file</button>
 									<div class="meta-list">
 										<MetaRow
 											label="Timing"
@@ -1463,11 +1489,9 @@
 							title="Recent hook calls"
 							detail="Timing captured around exported hook functions"
 						>
-							<svelte:fragment slot="meta"
-								><Badge>{state.hookEvents.length} calls</Badge></svelte:fragment
-							>
+							{#snippet meta()}<Badge>{devtools.hookEvents.length} calls</Badge>{/snippet}
 							<div class="load-list">
-								{#each state.hookEvents as event}
+								{#each devtools.hookEvents as event (event.id)}
 									<article class="load-card">
 										<div class="load-summary">
 											<div>
@@ -1501,16 +1525,16 @@
 								<h2>Imports</h2>
 								<p class="muted">Source imports grouped by specifier and importing files.</p>
 							</div>
-							<Badge>{visibleImports.length} / {state.imports.length} specifiers</Badge>
+							<Badge>{visibleImports.length} / {devtools.imports.length} specifiers</Badge>
 						</div>
 						<div class="toolbar">
 							<input bind:value={importQuery} type="search" placeholder="Search imports" />
 							<div class="select-tabs">
-								{#each importTabs as tab}
+								{#each importTabs as tab (tab.value)}
 									<button
 										class:active={importKind === tab.value}
 										type="button"
-										on:click={() => (importKind = tab.value)}
+										onclick={() => (importKind = tab.value)}
 									>
 										{tab.label}<small>{importCounts[tab.value]}</small>
 									</button>
@@ -1518,38 +1542,38 @@
 							</div>
 						</div>
 						<div class="detail-grid">
-							{#each visibleImports as item}
+							{#each visibleImports as item (item.id)}
 								<ImportCard {item} />
 							{:else}
 								<div class="empty">No imports found</div>
 							{/each}
 						</div>
 					{:else if view === 'plugins'}
-						<SimplePluginView plugins={state.project.vitePlugins} />
+						<SimplePluginView plugins={devtools.project.vitePlugins} />
 					{:else if view === 'runtime-config'}
 						<div class="section-head">
 							<div>
 								<h2>Runtime config</h2>
 								<p class="muted">Vite-exposed env and dev server runtime flags.</p>
 							</div>
-							<Badge>{state.runtimeConfig.env.length} vars</Badge>
+							<Badge>{devtools.runtimeConfig.env.length} vars</Badge>
 						</div>
 						<div class="detail-grid">
 							<article class="result-card">
 								<h3>App runtime</h3>
 								<div class="meta-list">
-									<MetaRow label="Mode" value={state.runtimeConfig.mode || 'unknown'} />
-									<MetaRow label="Base" value={state.runtimeConfig.base || '/'} />
+									<MetaRow label="Mode" value={devtools.runtimeConfig.mode || 'unknown'} />
+									<MetaRow label="Base" value={devtools.runtimeConfig.base || '/'} />
 									<MetaRow
 										label="Env prefix"
-										value={state.runtimeConfig.envPrefix.join(', ') || 'none'}
+										value={devtools.runtimeConfig.envPrefix.join(', ') || 'none'}
 									/>
 								</div>
 							</article>
 							<article class="result-card">
 								<h3>Public env</h3>
 								<div class="meta-list">
-									{#each state.runtimeConfig.env as item}
+									{#each devtools.runtimeConfig.env as item (item.name)}
 										<RuntimeEnvRow {item} />
 									{:else}
 										<div class="empty small">No Vite env found</div>
@@ -1568,7 +1592,7 @@
 							<button
 								type="button"
 								disabled={analysis.status === 'running'}
-								on:click={runBuildAnalyze}
+								onclick={runBuildAnalyze}
 							>
 								{analysis.status === 'running' ? 'Building' : 'Run build'}
 							</button>
@@ -1597,11 +1621,9 @@
 							</article>
 						</div>
 						<Panel title="Client assets" detail="Largest files from .svelte-kit/output/client">
-							<svelte:fragment slot="meta"
-								><Badge>{formatBytes(analysis.totalSize)}</Badge></svelte:fragment
-							>
+							{#snippet meta()}<Badge>{formatBytes(analysis.totalSize)}</Badge>{/snippet}
 							<div class="load-list">
-								{#each analysis.assets as asset}
+								{#each analysis.assets as asset (asset.path)}
 									{@const width = analysis.totalSize
 										? Math.max(4, Math.round((asset.size / analysis.totalSize) * 100))
 										: 4}
@@ -1623,7 +1645,7 @@
 														: 0}%
 												</div>
 											</div>
-											<button type="button" on:click={() => openSourceFile(asset.path)}
+											<button type="button" onclick={() => openSourceFile(asset.path)}
 												>Open file</button
 											>
 										</div>
@@ -1654,14 +1676,14 @@
 							<article class="result-card">
 								<h3>By kind</h3>
 								<div class="meta-list">
-									{#each moduleKinds as kind}
+									{#each moduleKinds as kind (kind)}
 										<MetaRow label={kind} value={String(moduleKindCount(graph, kind))} />
 									{/each}
 								</div>
 							</article>
 						</div>
 						<div class="load-list">
-							{#each graph.modules as module}
+							{#each graph.modules as module (module.id)}
 								<ModuleCard {module} {graph} onOpen={openSourceFile} />
 							{:else}
 								<div class="empty">Open app pages to populate the Vite module graph</div>
@@ -1673,21 +1695,19 @@
 								<h2>Tasks</h2>
 								<p class="muted">Package scripts from this SvelteKit app.</p>
 							</div>
-							<Badge>{state.tasks.length} scripts · {state.taskRuns.length} runs</Badge>
+							<Badge>{devtools.tasks.length} scripts · {devtools.taskRuns.length} runs</Badge>
 						</div>
 						<div class="detail-grid">
-							{#each state.tasks as task}
+							{#each devtools.tasks as task (task.name)}
 								<TaskCard {task} running={runningTasks[task.name] === true} onRun={runTask} />
 							{:else}
 								<div class="empty">No package scripts found</div>
 							{/each}
 						</div>
 						<Panel title="Recent runs" detail="Latest one-shot task output">
-							<svelte:fragment slot="meta"
-								><Badge>{state.taskRuns.length} runs</Badge></svelte:fragment
-							>
+							{#snippet meta()}<Badge>{devtools.taskRuns.length} runs</Badge>{/snippet}
 							<div class="load-list">
-								{#each state.taskRuns as run}
+								{#each devtools.taskRuns as run (run.id)}
 									<TaskRunCard {run} />
 								{:else}
 									<div class="empty">Run a task to capture output</div>
@@ -1700,7 +1720,7 @@
 								<h2>Open Graph</h2>
 								<p class="muted">SEO tags from the current app page.</p>
 							</div>
-							<button type="button" on:click={requestSeoMeta}
+							<button type="button" onclick={requestSeoMeta}
 								>{seoStatus === 'loading' ? 'Reading' : 'Refresh page meta'}</button
 							>
 						</div>
@@ -1709,9 +1729,9 @@
 								bind:value={seoRouteInput}
 								type="text"
 								aria-label="Open Graph route"
-								on:keydown={(event) => event.key === 'Enter' && openRoute(seoRouteInput, true)}
+								onkeydown={(event) => event.key === 'Enter' && openRoute(seoRouteInput, true)}
 							/>
-							<button type="button" on:click={() => openRoute(seoRouteInput, true)}
+							<button type="button" onclick={() => openRoute(seoRouteInput, true)}
 								>Open and refresh</button
 							>
 						</div>
@@ -1745,7 +1765,7 @@
 								<article class="result-card">
 									<h3>Missing tags</h3>
 									<div class="meta-list">
-										{#each missing as item}
+										{#each missing as item (item.key)}
 											<div class="meta-row">
 												<span>{item.label}</span>
 												<strong
@@ -1761,7 +1781,7 @@
 								<article class="result-card">
 									<h3>Resolved head tags</h3>
 									<div class="meta-list">
-										{#each normalizeSeoTags(seoMeta) as tag}
+										{#each normalizeSeoTags(seoMeta) as tag (`${tag.tag}:${tag.name}:${tag.value}`)}
 											<MetaRow label={`${tag.tag} ${tag.name}`} value={tag.value} />
 										{:else}
 											<div class="empty small">No head tags found</div>
@@ -1778,10 +1798,10 @@
 								<h2>Remote functions</h2>
 								<p class="muted">Exports from .remote.js and .remote.ts modules.</p>
 							</div>
-							<Badge>{state.remotes.length} functions</Badge>
+							<Badge>{devtools.remotes.length} functions</Badge>
 						</div>
 						<div class="detail-grid">
-							{#each state.remotes as remote}
+							{#each devtools.remotes as remote (remote.id)}
 								<RemoteCard
 									{remote}
 									input={remoteInputs[remote.id] ?? ''}
@@ -1801,11 +1821,9 @@
 							title="Recent remote calls"
 							detail="Calls captured from SvelteKit remote handlers"
 						>
-							<svelte:fragment slot="meta"
-								><Badge>{state.remoteCalls.length} calls</Badge></svelte:fragment
-							>
+							{#snippet meta()}<Badge>{devtools.remoteCalls.length} calls</Badge>{/snippet}
 							<div class="load-list">
-								{#each state.remoteCalls as call}
+								{#each devtools.remoteCalls as call (call.id)}
 									<article class="load-card">
 										<div class="load-summary">
 											<div>
@@ -1846,10 +1864,10 @@
 									SvelteKit +server endpoints with a same-origin request playground.
 								</p>
 							</div>
-							<Badge>{state.serverRoutes.length} routes</Badge>
+							<Badge>{devtools.serverRoutes.length} routes</Badge>
 						</div>
 						<div class="detail-grid">
-							{#each state.serverRoutes as route}
+							{#each devtools.serverRoutes as route (route.id)}
 								<ServerRouteCard
 									{route}
 									method={serverRouteMethods[route.id] ?? route.methods[0] ?? 'GET'}
@@ -1886,10 +1904,10 @@
 								<h2>Actions</h2>
 								<p class="muted">SvelteKit form actions from +page.server modules.</p>
 							</div>
-							<Badge>{state.routeActions.length} actions</Badge>
+							<Badge>{devtools.routeActions.length} actions</Badge>
 						</div>
 						<div class="detail-grid">
-							{#each state.routeActions as action}
+							{#each devtools.routeActions as action (action.id)}
 								<ActionCard
 									{action}
 									input={actionInputs[action.id] ?? '{}'}
@@ -1913,8 +1931,8 @@
 								<p class="muted">Files served from SvelteKit static.</p>
 							</div>
 							<Badge
-								>{visibleAssets.length} / {state.assets.length} files · {formatBytes(
-									state.assets.reduce((sum, asset) => sum + asset.size, 0),
+								>{visibleAssets.length} / {devtools.assets.length} files · {formatBytes(
+									devtools.assets.reduce((sum, asset) => sum + asset.size, 0),
 								)}</Badge
 							>
 						</div>
@@ -1922,23 +1940,23 @@
 							<input bind:value={assetQuery} type="search" placeholder="Search assets" />
 							<select bind:value={assetExtension}>
 								<option value="all">All extensions</option>
-								{#each assetExtensionOptions as ext}<option value={ext}>{ext}</option>{/each}
+								{#each assetExtensionOptions as ext (ext)}<option value={ext}>{ext}</option>{/each}
 							</select>
 							<div class="select-tabs">
 								<button
 									class:active={settings.assetsView === 'grid'}
 									type="button"
-									on:click={() => updateSettings({ assetsView: 'grid' })}>Grid</button
+									onclick={() => updateSettings({ assetsView: 'grid' })}>Grid</button
 								>
 								<button
 									class:active={settings.assetsView === 'list'}
 									type="button"
-									on:click={() => updateSettings({ assetsView: 'list' })}>List</button
+									onclick={() => updateSettings({ assetsView: 'list' })}>List</button
 								>
 							</div>
 						</div>
 						<div class:asset-list={settings.assetsView === 'list'} class="detail-grid">
-							{#each visibleAssets as asset}
+							{#each visibleAssets as asset (asset.id)}
 								<article
 									class="result-card asset-card"
 									class:selected={selectedAssetId === asset.id}
@@ -1954,11 +1972,11 @@
 										>
 									</div>
 									<div class="asset-actions">
-										<button type="button" on:click={() => (selectedAssetId = asset.id)}
+										<button type="button" onclick={() => (selectedAssetId = asset.id)}
 											>Details</button
 										>
-										<button type="button" on:click={() => openAsset(asset)}>Open asset</button>
-										<button type="button" on:click={() => openSourceFile(asset.path)}
+										<button type="button" onclick={() => openAsset(asset)}>Open asset</button>
+										<button type="button" onclick={() => openSourceFile(asset.path)}
 											>Open file</button
 										>
 									</div>
@@ -1974,7 +1992,7 @@
 										<h3>{selectedAsset.url}</h3>
 										<p class="muted">{selectedAsset.path}</p>
 									</div>
-									<button type="button" on:click={() => (selectedAssetId = '')}>Close</button>
+									<button type="button" onclick={() => (selectedAssetId = '')}>Close</button>
 								</div>
 								<AssetPreview asset={selectedAsset} />
 								<div class="meta-list">
@@ -1990,7 +2008,7 @@
 								<h2>Components</h2>
 								<p class="muted">Svelte files in src, with props and local imports.</p>
 							</div>
-							<Badge>{visibleComponents.length} / {state.components.length} components</Badge>
+							<Badge>{visibleComponents.length} / {devtools.components.length} components</Badge>
 						</div>
 						<div class="toolbar">
 							<input bind:value={componentQuery} type="search" placeholder="Search components" />
@@ -1998,12 +2016,12 @@
 								<button
 									class:active={settings.componentsView === 'list'}
 									type="button"
-									on:click={() => updateSettings({ componentsView: 'list' })}>List</button
+									onclick={() => updateSettings({ componentsView: 'list' })}>List</button
 								>
 								<button
 									class:active={settings.componentsView === 'graph'}
 									type="button"
-									on:click={() => updateSettings({ componentsView: 'graph' })}>Graph</button
+									onclick={() => updateSettings({ componentsView: 'graph' })}>Graph</button
 								>
 							</div>
 						</div>
@@ -2021,14 +2039,13 @@
 								{/if}
 							</div>
 						{:else}
-							{#if componentGraphEdges(state.components).length}
+							{#if componentGraphEdges(devtools.components).length}
 								<Panel title="Component graph" detail="Local component imports and route roots">
-									<svelte:fragment slot="meta"
-										><Badge>{componentGraphEdges(state.components).length} edges</Badge
-										></svelte:fragment
-									>
+									{#snippet meta()}<Badge
+											>{componentGraphEdges(devtools.components).length} edges</Badge
+										>{/snippet}
 									<div class="component-chain">
-										{#each componentGraphEdges(state.components) as edge}
+										{#each componentGraphEdges(devtools.components) as edge (`${edge.from.file}->${edge.to.file}`)}
 											<div class="component-chain-row">
 												<div>
 													<strong>{edge.from.name} -> {edge.to.name}</strong>
@@ -2037,7 +2054,7 @@
 												<Badge tone={edge.from.kind === 'route' ? 'hot' : 'default'}
 													>{edge.from.kind}</Badge
 												>
-												<button type="button" on:click={() => openSourceFile(edge.to.file)}
+												<button type="button" onclick={() => openSourceFile(edge.to.file)}
 													>Open target</button
 												>
 											</div>
@@ -2046,7 +2063,7 @@
 								</Panel>
 							{/if}
 							<div class="detail-grid">
-								{#each visibleComponents as component}
+								{#each visibleComponents as component (component.file)}
 									<ComponentCard {component} onOpen={openSourceFile} />
 								{:else}
 									<div class="empty">No components found</div>
@@ -2060,13 +2077,13 @@
 								<p class="muted">Generated files from .svelte-kit/generated.</p>
 							</div>
 							<Badge
-								>{state.virtualFiles.length} files · {formatBytes(
-									state.virtualFiles.reduce((sum, file) => sum + file.size, 0),
+								>{devtools.virtualFiles.length} files · {formatBytes(
+									devtools.virtualFiles.reduce((sum, file) => sum + file.size, 0),
 								)}</Badge
 							>
 						</div>
 						<div class="virtual-file-list">
-							{#each state.virtualFiles as file}
+							{#each devtools.virtualFiles as file (file.path)}
 								<VirtualFileCard {file} onOpen={openSourceFile} />
 							{:else}
 								<div class="empty">Run SvelteKit once to generate files</div>
@@ -2078,7 +2095,7 @@
 								<h2>Settings</h2>
 								<p class="muted">Personal panel preferences stored in this browser.</p>
 							</div>
-							<button type="button" on:click={() => updateSettings(defaultDevtoolsSettings)}
+							<button type="button" onclick={() => updateSettings(defaultDevtoolsSettings)}
 								>Reset settings</button
 							>
 						</div>
@@ -2089,7 +2106,7 @@
 									<label
 										><span class="muted">Theme</span><select
 											value={settings.theme}
-											on:change={(event) =>
+											onchange={(event) =>
 												updateSettings({
 													theme: event.currentTarget.value as DevtoolsSettings['theme'],
 												})}
@@ -2101,7 +2118,7 @@
 									<label
 										><span class="muted">Scale</span><select
 											value={settings.scale}
-											on:change={(event) =>
+											onchange={(event) =>
 												updateSettings({
 													scale: event.currentTarget.value as DevtoolsSettings['scale'],
 												})}
@@ -2114,15 +2131,14 @@
 										><input
 											type="checkbox"
 											checked={settings.compact}
-											on:change={(event) =>
-												updateSettings({ compact: event.currentTarget.checked })}
+											onchange={(event) => updateSettings({ compact: event.currentTarget.checked })}
 										/><span>Compact density</span></label
 									>
 									<label class="check-row"
 										><input
 											type="checkbox"
 											checked={settings.sidebarExpanded}
-											on:change={(event) =>
+											onchange={(event) =>
 												updateSettings({ sidebarExpanded: event.currentTarget.checked })}
 										/><span>Expanded sidebar</span></label
 									>
@@ -2130,7 +2146,7 @@
 										><input
 											type="checkbox"
 											checked={settings.sidebarScrollable}
-											on:change={(event) =>
+											onchange={(event) =>
 												updateSettings({ sidebarScrollable: event.currentTarget.checked })}
 										/><span>Scrollable sidebar</span></label
 									>
@@ -2138,7 +2154,7 @@
 										><span class="muted">Editor (blank = auto-detect)</span><input
 											value={settings.editor}
 											placeholder="code, cursor, webstorm"
-											on:change={(event) => updateSettings({ editor: event.currentTarget.value })}
+											onchange={(event) => updateSettings({ editor: event.currentTarget.value })}
 										/></label
 									>
 								</div>
@@ -2146,12 +2162,12 @@
 							<article class="result-card">
 								<h3>Categories</h3>
 								<div class="settings-list">
-									{#each navCategories as category}
+									{#each navCategories as category (category.id)}
 										<label class="check-row">
 											<input
 												type="checkbox"
 												checked={isCategoryVisible(settings, category.id)}
-												on:change={(event) =>
+												onchange={(event) =>
 													toggleHiddenCategory(category.id, !event.currentTarget.checked)}
 											/>
 											<span>{category.label}</span>
@@ -2162,12 +2178,12 @@
 							<article class="result-card">
 								<h3>Views</h3>
 								<div class="settings-list">
-									{#each configurableViews as item}
+									{#each configurableViews as item (item)}
 										<label class="check-row">
 											<input
 												type="checkbox"
 												checked={isViewVisible(settings, item)}
-												on:change={(event) => toggleHiddenView(item, !event.currentTarget.checked)}
+												onchange={(event) => toggleHiddenView(item, !event.currentTarget.checked)}
 											/>
 											<span>{viewLabels[item]}</span>
 										</label>
@@ -2177,12 +2193,12 @@
 							<article class="result-card">
 								<h3>Pinned views</h3>
 								<div class="settings-list">
-									{#each configurableViews as item}
+									{#each configurableViews as item (item)}
 										<label class="check-row">
 											<input
 												type="checkbox"
 												checked={settings.pinnedViews.includes(item)}
-												on:change={(event) => togglePinnedView(item, event.currentTarget.checked)}
+												onchange={(event) => togglePinnedView(item, event.currentTarget.checked)}
 											/>
 											<span>{viewLabels[item]}</span>
 										</label>
@@ -2204,8 +2220,8 @@
 			role="button"
 			tabindex="0"
 			aria-label="Close command palette"
-			on:click={closePaletteFromBackdrop}
-			on:keydown={closePaletteFromBackdrop}
+			onclick={closePaletteFromBackdrop}
+			onkeydown={closePaletteFromBackdrop}
 		>
 			<div class="palette-panel" role="dialog" aria-modal="true" aria-label="Command palette">
 				<div class="palette-head">
@@ -2215,17 +2231,17 @@
 						type="search"
 						autocomplete="off"
 						placeholder="Search commands"
-						on:input={() => (paletteIndex = 0)}
+						oninput={() => (paletteIndex = 0)}
 					/>
-					<button type="button" on:click={() => (paletteOpen = false)}>Close</button>
+					<button type="button" onclick={() => (paletteOpen = false)}>Close</button>
 				</div>
 				<div class="palette-list">
-					{#each paletteResults as command, index}
+					{#each paletteResults as command, index (command.id)}
 						<button
 							class:active={index === paletteIndex}
 							type="button"
-							on:mouseenter={() => (paletteIndex = index)}
-							on:click={() => runCommand(command.id)}
+							onmouseenter={() => (paletteIndex = index)}
+							onclick={() => runCommand(command.id)}
 						>
 							<span>{command.label}</span>
 							<small>{command.group}</small>

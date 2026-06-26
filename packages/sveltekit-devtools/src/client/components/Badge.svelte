@@ -1,7 +1,10 @@
 <script lang="ts">
-	export let tone: 'default' | 'hot' | 'warn' = 'default';
+	import type { Snippet } from 'svelte';
+
+	let { tone = 'default', children }: { tone?: 'default' | 'hot' | 'warn'; children?: Snippet } =
+		$props();
 </script>
 
 <span class:hot={tone === 'hot'} class:warn={tone === 'warn'} class="badge">
-	<slot />
+	{#if children}{@render children()}{/if}
 </span>

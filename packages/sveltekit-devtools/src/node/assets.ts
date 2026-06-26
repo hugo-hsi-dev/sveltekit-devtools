@@ -1,7 +1,8 @@
-import { readdir, stat } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { AssetInfo } from '../shared/types.js';
+import { exists, slash, walkFiles } from './files.js';
 
 interface ScanAssetsOptions {
 	root: string;
@@ -14,7 +15,7 @@ const textExtensions = new Set(['.css', '.html', '.js', '.json', '.md', '.txt', 
 export async function scanAssets({ root, staticDir }: ScanAssetsOptions): Promise<AssetInfo[]> {
 	if (!(await exists(staticDir))) return [];
 
-	const files = await walk(staticDir);
+	const files = await walkFiles(staticDir);
 	const assets = await Promise.all(
 		files.map(async (file) => {
 			const found = await stat(file);
@@ -33,26 +34,6 @@ export async function scanAssets({ root, staticDir }: ScanAssetsOptions): Promis
 	);
 
 	return assets.sort((a, b) => a.path.localeCompare(b.path));
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
 }
 
 function previewKind(file: string): AssetInfo['preview'] {
@@ -77,8 +58,4 @@ function mimeType(file: string) {
 	if (extension === '.webp') return 'image/webp';
 	if (extension === '.xml') return 'application/xml';
 	return 'application/octet-stream';
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

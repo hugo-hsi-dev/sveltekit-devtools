@@ -1,8 +1,9 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as ts from 'typescript';
 
 import type { RouteActionInfo } from '../shared/types.js';
+import { exists, slash, walkFiles } from './files.js';
 import { routeIdFromFile, routePathFromId } from './routes.js';
 
 interface ScanRouteActionsOptions {
@@ -16,7 +17,7 @@ export async function scanRouteActions({
 }: ScanRouteActionsOptions): Promise<RouteActionInfo[]> {
 	if (!(await exists(routesDir))) return [];
 
-	const files = (await walk(routesDir)).filter((file) =>
+	const files = (await walkFiles(routesDir)).filter((file) =>
 		/^\+page\.server\.[jt]s$/.test(path.basename(file)),
 	);
 	const actions: RouteActionInfo[] = [];
@@ -78,28 +79,4 @@ function isExported(node: ts.Node) {
 		ts.canHaveModifiers(node) &&
 		ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
 	);
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

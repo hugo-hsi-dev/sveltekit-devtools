@@ -51,18 +51,6 @@ export function componentGraphEdges(components: ComponentInfo[]): ComponentGraph
 	return edges;
 }
 
-export function filterComponents(components: ComponentInfo[], query: string) {
-	const value = query.trim().toLowerCase();
-	if (!value) return components;
-
-	return components.filter((component) =>
-		[component.name, component.file, component.route ?? '', component.kind, ...component.props]
-			.join(' ')
-			.toLowerCase()
-			.includes(value),
-	);
-}
-
 function componentSort(a: ComponentInfo, b: ComponentInfo) {
 	if (a.kind !== b.kind) return a.kind === 'route' ? -1 : 1;
 	return a.file.localeCompare(b.file);

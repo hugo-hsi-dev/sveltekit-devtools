@@ -1,7 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { VirtualFileInfo } from '../shared/types.js';
+import { exists, slash, walkFiles } from './files.js';
 
 interface ScanVirtualFilesOptions {
 	root: string;
@@ -18,7 +19,7 @@ export async function scanVirtualFiles({
 }: ScanVirtualFilesOptions): Promise<VirtualFileInfo[]> {
 	if (!(await exists(generatedDir))) return [];
 
-	const files = await walk(generatedDir);
+	const files = await walkFiles(generatedDir);
 	const virtualFiles = await Promise.all(
 		files.map(async (file) => {
 			const found = await stat(file);
@@ -53,28 +54,4 @@ function virtualFileKind(relative: string): VirtualFileInfo['kind'] {
 	if (first === 'client' || first === 'server' || first === 'shared') return first;
 	if (first?.startsWith('root')) return 'root';
 	return 'other';
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

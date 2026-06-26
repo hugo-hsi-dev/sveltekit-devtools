@@ -116,3 +116,32 @@ test('runtime load tracker captures event.fetch responses', async () => {
 		],
 	});
 });
+
+test('runtime tracker posts browser events to configured base', async () => {
+	clearLoadEvents();
+	const requests: string[] = [];
+	const originalWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
+	const originalFetch = globalThis.fetch;
+	(globalThis as typeof globalThis & { window?: unknown }).window = {};
+	globalThis.fetch = ((input: RequestInfo | URL) => {
+		requests.push(String(input));
+		return Promise.resolve(new Response('{}'));
+	}) as typeof fetch;
+
+	try {
+		const module = await import(
+			`data:text/javascript;base64,${Buffer.from(runtimeModuleCode(10, '/custom-devtools/')).toString('base64')}#${Date.now()}`
+		);
+		const load = module.__sveltekitDevtoolsTrackLoad(
+			{ route: '/', file: 'src/routes/+page.ts' },
+			async () => ({ ok: true }),
+		);
+
+		await load({ url: new URL('http://localhost/') });
+
+		expect(requests).toEqual(['/custom-devtools/api/load']);
+	} finally {
+		globalThis.fetch = originalFetch;
+		(globalThis as typeof globalThis & { window?: unknown }).window = originalWindow;
+	}
+});

@@ -1,6 +1,3 @@
-import type { DevtoolsState, HttpMethod, SeoMeta } from '../../shared/types';
-import type { DevtoolsSettings } from '../settings';
-
 export type View =
 	| 'overview'
 	| 'routes'
@@ -92,13 +89,6 @@ export const viewIcons: Record<View, string> = {
 	settings: 'settings',
 };
 
-// Ordered list of rail entries. `divider: true` draws a category boundary
-// line *before* the entry. Settings is rendered separately in the rail footer.
-export interface RailEntry {
-	view: View;
-	divider?: boolean;
-}
-
 export interface NavCategory {
 	id: 'app' | 'server' | 'analyze';
 	label: string;
@@ -129,27 +119,6 @@ export const viewToCategory = Object.fromEntries(
 	navCategories.flatMap((category) => category.views.map((view) => [view, category.id])),
 ) as Partial<Record<View, NavCategory['id']>>;
 
-export const railEntries: RailEntry[] = [
-	{ view: 'overview' },
-	{ view: 'routes', divider: true },
-	{ view: 'loads' },
-	{ view: 'timeline' },
-	{ view: 'hooks' },
-	{ view: 'server-routes' },
-	{ view: 'actions' },
-	{ view: 'remotes' },
-	{ view: 'open-graph' },
-	{ view: 'components', divider: true },
-	{ view: 'imports' },
-	{ view: 'assets' },
-	{ view: 'virtual-files' },
-	{ view: 'plugins', divider: true },
-	{ view: 'runtime-config' },
-	{ view: 'inspect' },
-	{ view: 'build-analyze' },
-	{ view: 'tasks' },
-];
-
 export const allViews: View[] = [
 	'overview',
 	'routes',
@@ -175,28 +144,3 @@ export const allViews: View[] = [
 export const configurableViews = allViews.filter(
 	(item) => item !== 'overview' && item !== 'settings',
 );
-
-// The interaction-state object passed into pure render functions.
-export interface ViewContext {
-	state: DevtoolsState;
-	view: View;
-	selectedRoute: string;
-	routeSearch: string;
-	remoteInputs: Record<string, string>;
-	remoteResults: Record<string, { status: RemoteRunState; text: string }>;
-	runningTasks: Record<string, boolean>;
-	serverRouteBodies: Record<string, string>;
-	serverRouteHeaders: Record<string, string>;
-	serverRouteMethods: Record<string, HttpMethod>;
-	serverRoutePaths: Record<string, string>;
-	serverRouteResults: Record<string, ServerRouteResult>;
-	actionInputs: Record<string, string>;
-	actionResults: Record<string, ActionResult>;
-	routeParamInputs: Record<string, Record<string, string>>;
-	componentQuery: string;
-	seoMeta: SeoMeta | null;
-	seoStatus: 'idle' | 'loading' | 'ready' | 'error';
-	seoError: string;
-	settings: DevtoolsSettings;
-	routeParamValues: (route: import('../../shared/types').SvelteKitRoute) => Record<string, string>;
-}

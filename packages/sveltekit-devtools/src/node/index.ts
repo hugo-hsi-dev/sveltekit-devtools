@@ -1,7 +1,6 @@
 /// <reference types="@vitejs/devtools-kit" />
 
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -26,6 +25,7 @@ import { isRemoteModule, scanRemotes, transformRemoteModule } from './remotes.js
 import { cleanId, isRouteLoadModule, scanRoutes } from './routes.js';
 import { scanRuntimeConfig } from './runtime-config.js';
 import { scanServerRoutes } from './server-routes.js';
+import { fileExists, viteFsPath } from './files.js';
 import {
 	addLoadEvent,
 	addHookEvent,
@@ -172,7 +172,7 @@ function sveltekitDevtoolsPlugin(options: SvelteKitDevtoolsOptions = {}): Plugin
 			return null;
 		},
 		load(id) {
-			if (id === resolvedRuntimeModuleId) return runtimeModuleCode(maxLoadEvents);
+			if (id === resolvedRuntimeModuleId) return runtimeModuleCode(maxLoadEvents, base);
 			if (id === resolvedClientBridgeModuleId) return clientBridgeModuleCode();
 			if (id === resolvedDockModuleId) return dockModuleCode(base);
 			return null;
@@ -395,20 +395,10 @@ async function resolveStaticFile(relative: string) {
 	const target = path.resolve(clientDist, relative);
 	if (!target.startsWith(clientDist)) return null;
 
-	try {
-		const found = await stat(target);
-		if (found.isFile()) return target;
-	} catch {
-		// fall through to SPA fallback
-	}
+	if (await fileExists(target)) return target;
 
 	const index = path.join(clientDist, 'index.html');
-	try {
-		await stat(index);
-		return index;
-	} catch {
-		return null;
-	}
+	return (await fileExists(index)) ? index : null;
 }
 
 async function readBody(req: IncomingMessage) {
@@ -433,13 +423,4 @@ function mimeType(file: string) {
 	if (file.endsWith('.css')) return 'text/css; charset=utf-8';
 	if (file.endsWith('.svg')) return 'image/svg+xml';
 	return 'application/octet-stream';
-}
-
-function slashPath(value: string) {
-	return value.replaceAll(path.sep, '/');
-}
-
-function viteFsPath(value: string) {
-	const normalized = slashPath(value);
-	return normalized.startsWith('/') ? `/@fs${normalized}` : `/@fs/${normalized}`;
 }
