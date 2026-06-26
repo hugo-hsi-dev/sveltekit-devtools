@@ -1,8 +1,9 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import * as ts from 'typescript';
 
 import type { RemoteFunctionInfo, RemoteFunctionKind } from '../shared/types.js';
+import { exists, isInside, slash, viteFsPath, walkFiles } from './files.js';
 
 interface ScanRemotesOptions {
 	root: string;
@@ -19,7 +20,7 @@ export async function scanRemotes({
 }: ScanRemotesOptions): Promise<RemoteFunctionInfo[]> {
 	if (!(await exists(srcDir))) return [];
 
-	const files = (await walk(srcDir)).filter(
+	const files = (await walkFiles(srcDir)).filter(
 		(file) => /\.remote\.[jt]s$/.test(file) && !isInside(path.join(srcDir, 'lib/server'), file),
 	);
 	const remotes: RemoteFunctionInfo[] = [];
@@ -165,38 +166,4 @@ function isExported(node: ts.Node) {
 		ts.canHaveModifiers(node) &&
 		ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
 	);
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function isInside(parent: string, child: string) {
-	const relative = path.relative(parent, child);
-	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
-}
-
-function viteFsPath(file: string) {
-	const normalized = slash(file);
-	return normalized.startsWith('/') ? `/@fs${normalized}` : `/@fs/${normalized}`;
 }

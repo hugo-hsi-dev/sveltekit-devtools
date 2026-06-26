@@ -3,7 +3,7 @@
 	import Badge from './Badge.svelte';
 	import MetaRow from './MetaRow.svelte';
 
-	export let item: ImportInfo;
+	let { item }: { item: ImportInfo } = $props();
 </script>
 
 <article class="result-card">
@@ -15,7 +15,7 @@
 		<Badge>{item.kind}</Badge>
 	</div>
 	<div class="meta-list">
-		{#each item.importedBy as file}
+		{#each item.importedBy as file (file)}
 			<MetaRow label="Imported by" value={file} />
 		{/each}
 	</div>

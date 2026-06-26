@@ -19,10 +19,7 @@
 	/>
 	<link rel="canonical" href="http://127.0.0.1:5173/" />
 	<meta property="og:title" content="SvelteKit Devtools Playground" />
-	<meta
-		property="og:description"
-		content="A playground for testing SvelteKit Devtools features."
-	/>
+	<meta property="og:description" content="A playground for testing SvelteKit Devtools features." />
 	<meta property="og:image" content="/sveltekit-devtools.svg" />
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary_large_image" />

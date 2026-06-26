@@ -1,11 +1,19 @@
 <script lang="ts">
 	import Badge from './Badge.svelte';
 
-	export let file: string;
-	export let title: string;
-	export let badge: string;
-	export let warn = false;
-	export let onOpen: (file: string) => void = () => {};
+	let {
+		file,
+		title,
+		badge,
+		warn = false,
+		onOpen = () => {},
+	}: {
+		file: string;
+		title: string;
+		badge: string;
+		warn?: boolean;
+		onOpen?: (file: string) => void;
+	} = $props();
 </script>
 
 <div class="file-card">
@@ -14,5 +22,5 @@
 		<Badge tone={warn ? 'warn' : 'default'}>{badge}</Badge>
 	</div>
 	<p><code>{file}</code></p>
-	<button type="button" on:click={() => onOpen(file)}>Open file</button>
+	<button type="button" onclick={() => onOpen(file)}>Open file</button>
 </div>

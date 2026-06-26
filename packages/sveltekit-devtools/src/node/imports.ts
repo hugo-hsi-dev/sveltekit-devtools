@@ -1,7 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { ImportInfo } from '../shared/types.js';
+import { exists, slash, walkFiles } from './files.js';
 
 interface ScanImportsOptions {
 	root: string;
@@ -16,7 +17,9 @@ const assetPattern = /\.(css|gif|jpg|jpeg|png|svg|webp|avif|json|md)$/i;
 export async function scanImports({ root, srcDir }: ScanImportsOptions): Promise<ImportInfo[]> {
 	if (!(await exists(srcDir))) return [];
 
-	const files = (await walk(srcDir)).filter((file) => sourceExtensions.has(path.extname(file)));
+	const files = (await walkFiles(srcDir)).filter((file) =>
+		sourceExtensions.has(path.extname(file)),
+	);
 	const imports = new Map<string, ImportInfo>();
 
 	for (const file of files) {
@@ -57,28 +60,4 @@ function importKind(specifier: string): ImportInfo['kind'] {
 	if (assetPattern.test(specifier)) return 'asset';
 	if (specifier.startsWith('.')) return 'relative';
 	return 'package';
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

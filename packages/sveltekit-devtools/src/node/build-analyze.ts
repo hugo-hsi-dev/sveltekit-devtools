@@ -1,8 +1,9 @@
 import { exec } from 'node:child_process';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { BuildAnalysis, BuildAssetInfo } from '../shared/types.js';
+import { exists, slash, walkFiles } from './files.js';
 
 interface BuildAnalyzeOptions {
 	root: string;
@@ -18,7 +19,7 @@ export async function scanBuildOutput({
 }: BuildAnalyzeOptions): Promise<BuildAnalysis> {
 	if (!(await exists(outputDir))) return idleBuildAnalysis();
 
-	const files = await walk(outputDir);
+	const files = await walkFiles(outputDir);
 	const assets = await Promise.all(
 		files.map(async (file) => {
 			const found = await stat(file);
@@ -125,26 +126,6 @@ function execCommand(command: string, cwd: string) {
 	});
 }
 
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
 function assetType(file: string): BuildAssetInfo['type'] {
 	const extension = path.extname(file).toLowerCase();
 	if (extension === '.js') return 'js';
@@ -162,8 +143,4 @@ function assetType(file: string): BuildAssetInfo['type'] {
 
 function trimOutput(output: string) {
 	return output.length > outputLimit ? output.slice(-outputLimit) : output;
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

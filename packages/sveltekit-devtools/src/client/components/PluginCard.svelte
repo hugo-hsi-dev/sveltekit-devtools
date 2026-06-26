@@ -2,7 +2,7 @@
 	import type { VitePluginInfo } from '../../shared/types';
 	import MetaRow from './MetaRow.svelte';
 
-	export let plugin: VitePluginInfo;
+	let { plugin }: { plugin: VitePluginInfo } = $props();
 </script>
 
 <article class="result-card compact-card">

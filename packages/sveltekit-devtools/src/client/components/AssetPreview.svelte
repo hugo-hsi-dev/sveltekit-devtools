@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { AssetInfo } from '../../shared/types';
 
-	export let asset: AssetInfo;
+	let { asset }: { asset: AssetInfo } = $props();
 </script>
 
 {#if asset.preview === 'image'}

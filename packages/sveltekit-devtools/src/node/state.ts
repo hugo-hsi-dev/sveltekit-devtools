@@ -51,10 +51,11 @@ export function clearLoadEvents() {
 	state().loads.length = 0;
 }
 
-export function runtimeModuleCode(maxLoadEvents: number) {
+export function runtimeModuleCode(maxLoadEvents: number, base = '/__sveltekit-devtools/') {
 	return `
 const STATE_KEY = '${STATE_KEY}';
 const MAX_LOAD_EVENTS = ${maxLoadEvents};
+const API_BASE = ${JSON.stringify(base)};
 
 function getState() {
 	globalThis[STATE_KEY] ||= { loads: [], remoteCalls: [], hookEvents: [] };
@@ -205,7 +206,7 @@ function save(event) {
 	if (state.loads.length > MAX_LOAD_EVENTS) state.loads.length = MAX_LOAD_EVENTS;
 
 	if (typeof window !== 'undefined' && typeof fetch === 'function') {
-		fetch('/__sveltekit-devtools/api/load', {
+		fetch(API_BASE + 'api/load', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(event),
@@ -220,7 +221,7 @@ function saveRemote(event) {
 	if (state.remoteCalls.length > MAX_LOAD_EVENTS) state.remoteCalls.length = MAX_LOAD_EVENTS;
 
 	if (typeof window !== 'undefined' && typeof fetch === 'function') {
-		fetch('/__sveltekit-devtools/api/remote-call', {
+		fetch(API_BASE + 'api/remote-call', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(event),
@@ -235,7 +236,7 @@ function saveHook(event) {
 	if (state.hookEvents.length > MAX_LOAD_EVENTS) state.hookEvents.length = MAX_LOAD_EVENTS;
 
 	if (typeof window !== 'undefined' && typeof fetch === 'function') {
-		fetch('/__sveltekit-devtools/api/hook', {
+		fetch(API_BASE + 'api/hook', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(event),

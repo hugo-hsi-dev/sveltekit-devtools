@@ -3,17 +3,23 @@
 	import Badge from './Badge.svelte';
 	import MetaRow from './MetaRow.svelte';
 
-	export let remote: RemoteFunctionInfo;
-	export let input = '';
-	export let result: { status: 'idle' | 'running' | 'success' | 'error'; text: string } = {
-		status: 'idle',
-		text: 'No result yet',
-	};
-	export let onInput: (value: string) => void = () => {};
-	export let onRun: () => void = () => {};
-	export let onOpen: (file: string) => void = () => {};
+	let {
+		remote,
+		input = '',
+		result = { status: 'idle', text: 'No result yet' },
+		onInput = () => {},
+		onRun = () => {},
+		onOpen = () => {},
+	}: {
+		remote: RemoteFunctionInfo;
+		input?: string;
+		result?: { status: 'idle' | 'running' | 'success' | 'error'; text: string };
+		onInput?: (value: string) => void;
+		onRun?: () => void;
+		onOpen?: (file: string) => void;
+	} = $props();
 
-	$: canRun = remote.callable && result.status !== 'running';
+	let canRun = $derived(remote.callable && result.status !== 'running');
 </script>
 
 <article class="result-card">
@@ -24,7 +30,7 @@
 		</div>
 		<Badge tone={remote.kind === 'command' ? 'warn' : 'hot'}>{remote.kind}</Badge>
 	</div>
-	<button type="button" on:click={() => onOpen(remote.file)}>Open file</button>
+	<button type="button" onclick={() => onOpen(remote.file)}>Open file</button>
 	<div class="meta-list">
 		<MetaRow label="Validator" value={remote.validator} />
 		<MetaRow label="Export" value={remote.name} />
@@ -35,9 +41,9 @@
 			<textarea
 				placeholder={'{"id":"42"}'}
 				value={input}
-				on:input={(event) => onInput(event.currentTarget.value)}></textarea>
+				oninput={(event) => onInput(event.currentTarget.value)}></textarea>
 		</label>
-		<button type="button" disabled={!canRun} on:click={onRun}>
+		<button type="button" disabled={!canRun} onclick={onRun}>
 			{remote.callable
 				? result.status === 'running'
 					? 'Running'

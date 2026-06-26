@@ -1,6 +1,12 @@
 <script lang="ts">
-	export let title: string;
-	export let detail = '';
+	import type { Snippet } from 'svelte';
+
+	let {
+		title,
+		detail = '',
+		meta,
+		children,
+	}: { title: string; detail?: string; meta?: Snippet; children?: Snippet } = $props();
 </script>
 
 <section class="remote-calls">
@@ -9,7 +15,7 @@
 			<h3>{title}</h3>
 			{#if detail}<p class="muted">{detail}</p>{/if}
 		</div>
-		<slot name="meta" />
+		{#if meta}{@render meta()}{/if}
 	</div>
-	<slot />
+	{#if children}{@render children()}{/if}
 </section>

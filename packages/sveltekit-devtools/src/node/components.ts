@@ -1,7 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { ComponentInfo } from '../shared/types.js';
+import { exists, isInside, slash, walkFiles } from './files.js';
 import { routeIdFromDir, routePathFromId } from './routes.js';
 
 interface ScanComponentsOptions {
@@ -17,7 +18,7 @@ export async function scanComponents({
 }: ScanComponentsOptions): Promise<ComponentInfo[]> {
 	if (!(await exists(srcDir))) return [];
 
-	const files = (await walk(srcDir)).filter((file) => file.endsWith('.svelte'));
+	const files = (await walkFiles(srcDir)).filter((file) => file.endsWith('.svelte'));
 	const importsByFile = new Map<string, string[]>();
 	const components: ComponentInfo[] = [];
 
@@ -104,33 +105,4 @@ function componentName(file: string) {
 		.filter(Boolean)
 		.map((part) => part[0]?.toUpperCase() + part.slice(1))
 		.join('');
-}
-
-async function walk(dir: string): Promise<string[]> {
-	const entries = await readdir(dir, { withFileTypes: true });
-	const nested = await Promise.all(
-		entries.map((entry) => {
-			const file = path.join(dir, entry.name);
-			return entry.isDirectory() ? walk(file) : [file];
-		}),
-	);
-	return nested.flat();
-}
-
-async function exists(file: string) {
-	try {
-		await stat(file);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function isInside(parent: string, child: string) {
-	const relative = path.relative(parent, child);
-	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
-
-function slash(value: string) {
-	return value.replaceAll(path.sep, '/');
 }

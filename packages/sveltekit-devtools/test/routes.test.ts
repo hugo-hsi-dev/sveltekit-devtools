@@ -70,3 +70,40 @@ test('normalizes SvelteKit params', () => {
 		'/shop/:category/:page?/*rest',
 	);
 });
+
+test('scans SvelteKit layout reset route files', async () => {
+	await mkdir(path.join(root, 'src/routes/(app)/item/[id]/embed'), { recursive: true });
+	await mkdir(path.join(root, 'src/routes/(app)/reset'), { recursive: true });
+	await writeFile(path.join(root, 'src/routes/+layout.svelte'), '');
+	await writeFile(path.join(root, 'src/routes/(app)/+layout.svelte'), '');
+	await writeFile(path.join(root, 'src/routes/(app)/item/+layout@.svelte'), '');
+	await writeFile(path.join(root, 'src/routes/(app)/item/[id]/+page.svelte'), '');
+	await writeFile(path.join(root, 'src/routes/(app)/item/[id]/embed/+page@(app).svelte'), '');
+	await writeFile(path.join(root, 'src/routes/(app)/reset/+page@.svelte'), '');
+
+	const routes = await scanRoutes({ root, routesDir: path.join(root, 'src/routes') });
+	const item = routes.find((route) => route.path === '/item/:id');
+	const embed = routes.find((route) => route.path === '/item/:id/embed');
+	const reset = routes.find((route) => route.path === '/reset');
+
+	expect(item?.chain.map((file) => [file.name, file.path, file.layoutReset])).toEqual([
+		['+layout.svelte', 'src/routes/+layout.svelte', undefined],
+		['+layout.ts', 'src/routes/+layout.ts', undefined],
+		['+error.svelte', 'src/routes/+error.svelte', undefined],
+		['+layout@.svelte', 'src/routes/(app)/item/+layout@.svelte', ''],
+		['+page.svelte', 'src/routes/(app)/item/[id]/+page.svelte', undefined],
+	]);
+	expect(embed?.chain.map((file) => [file.name, file.path, file.layoutReset])).toEqual([
+		['+layout.svelte', 'src/routes/+layout.svelte', undefined],
+		['+layout.ts', 'src/routes/+layout.ts', undefined],
+		['+error.svelte', 'src/routes/+error.svelte', undefined],
+		['+layout.svelte', 'src/routes/(app)/+layout.svelte', undefined],
+		['+page@(app).svelte', 'src/routes/(app)/item/[id]/embed/+page@(app).svelte', '(app)'],
+	]);
+	expect(reset?.chain.map((file) => [file.name, file.path, file.layoutReset])).toEqual([
+		['+layout.svelte', 'src/routes/+layout.svelte', undefined],
+		['+layout.ts', 'src/routes/+layout.ts', undefined],
+		['+error.svelte', 'src/routes/+error.svelte', undefined],
+		['+page@.svelte', 'src/routes/(app)/reset/+page@.svelte', ''],
+	]);
+});
