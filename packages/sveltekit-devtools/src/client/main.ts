@@ -1,3 +1,9 @@
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/dm-sans/700.css';
+import '@fontsource/dm-mono/400.css';
+import '@fontsource/dm-mono/500.css';
 import './style.css';
 
 import type {
@@ -43,6 +49,8 @@ import {
 import { bestSeoDescription, bestSeoImage, bestSeoTitle, missingSeoTags } from './seo';
 import { isViewVisible, normalizeSettings, setHiddenView, type DevtoolsSettings } from './settings';
 import { timelineEvents, type TimelineEvent } from './timeline';
+import { icons, svelteLogo } from './shared/icons';
+import { railEntries, viewIcons } from './shared/view-context';
 
 type View =
 	| 'overview'
@@ -109,6 +117,9 @@ const virtualFilesViewEl = element('#virtual-files-view');
 const settingsViewEl = element('#settings-view');
 const commandPaletteEl = element('#command-palette');
 const searchEl = element<HTMLInputElement>('#route-search');
+const railEl = element('#rail');
+const viewTitleEl = element('#view-title');
+const routesSidebarEl = element('#routes-sidebar');
 const allViews: View[] = [
 	'overview',
 	'routes',
@@ -219,8 +230,12 @@ let seoError = '';
 let settings = loadSettings();
 let paletteOpen = false;
 let paletteQuery = '';
+let hostTheme: 'dark' | 'light' | null = null;
 
 applySettings();
+window.matchMedia?.('(prefers-color-scheme: light)')?.addEventListener?.('change', () => {
+	if (settings.theme === 'auto') applySettings();
+});
 element('#open-command-palette').addEventListener('click', () => openPalette());
 element('#refresh').addEventListener('click', () => refresh());
 element('#clear-loads').addEventListener('click', async () => {
@@ -238,6 +253,21 @@ document.addEventListener('click', (event) => {
 	if (tab) {
 		pauseAutoRefresh();
 		setView(tab.dataset.view as View);
+		return;
+	}
+
+	if ((event.target as Element | null)?.closest('button[data-reset-settings]')) {
+		settings = normalizeSettings(null, configurableViews);
+		saveSettings();
+		render();
+		return;
+	}
+
+	if ((event.target as Element | null)?.closest('button[data-timeline-record]')) {
+		timelineRecording = !timelineRecording;
+		timelineSnapshot = timelineRecording ? null : timelineEvents(state);
+		pauseAutoRefresh();
+		renderTimeline();
 		return;
 	}
 
@@ -464,6 +494,38 @@ document.addEventListener('change', (event) => {
 		return;
 	}
 
+	const settingTheme = (event.target as Element | null)?.closest<HTMLSelectElement>(
+		'select[data-setting-theme]',
+	);
+	if (settingTheme) {
+		settings = normalizeSettings(
+			{ ...settings, theme: settingTheme.value as DevtoolsSettings['theme'] },
+			configurableViews,
+		);
+		saveSettings();
+		render();
+		return;
+	}
+
+	const settingEditor = (event.target as Element | null)?.closest<HTMLInputElement>(
+		'input[data-setting-editor]',
+	);
+	if (settingEditor) {
+		settings = normalizeSettings({ ...settings, editor: settingEditor.value }, configurableViews);
+		saveSettings();
+		return;
+	}
+
+	const timelineKindSel = (event.target as Element | null)?.closest<HTMLSelectElement>(
+		'select[data-timeline-kind]',
+	);
+	if (timelineKindSel) {
+		timelineKind = timelineKindSel.value;
+		pauseAutoRefresh();
+		renderTimeline();
+		return;
+	}
+
 	const method = (event.target as Element | null)?.closest<HTMLSelectElement>(
 		'select[data-server-route-method]',
 	);
@@ -492,10 +554,32 @@ document.addEventListener('keydown', (event) => {
 	}
 });
 
+const initialHash = location.hash.slice(1) as View;
+if (allViews.includes(initialHash) && isViewVisible(settings, initialHash)) {
+	view = initialHash;
+} else if (location.hash) {
+	history.replaceState(null, '', `#${view}`);
+}
+
 void refresh();
+
+// Live push: refresh near-instantly when the server reports new runtime events,
+// with a slower poll as a fallback (covers file-scan changes SSE doesn't push).
+let sseRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+try {
+	const events = new EventSource('/__sveltekit-devtools/api/events');
+	events.onmessage = () => {
+		if (document.hidden || Date.now() <= pauseAutoRefreshUntil) return;
+		clearTimeout(sseRefreshTimer);
+		sseRefreshTimer = setTimeout(() => void refresh(false), 120);
+	};
+} catch {
+	// EventSource unavailable — the poll below still keeps state fresh
+}
+
 setInterval(() => {
 	if (!document.hidden && Date.now() > pauseAutoRefreshUntil) void refresh(false);
-}, 1800);
+}, 4000);
 
 async function refresh(showLoading = true) {
 	if (showLoading) setStatus('Loading', '');
@@ -555,15 +639,167 @@ function saveSettings() {
 	applySettings();
 }
 
+function resolvedTheme(): 'dark' | 'light' {
+	if (settings.theme === 'dark' || settings.theme === 'light') return settings.theme;
+	if (hostTheme) return hostTheme;
+	return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
 function applySettings() {
 	document.documentElement.style.setProperty('--devtools-font-size', `${settings.scale}%`);
 	document.body.dataset.density = settings.compact ? 'compact' : 'comfortable';
+	document.documentElement.dataset.theme = resolvedTheme();
+}
+
+const collapsedKey = 'sveltekit-devtools:collapsed';
+const sectionChevron =
+	'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8l4 4 4-4" /></svg>';
+let collapsedSections = loadCollapsedSections();
+
+function loadCollapsedSections(): Set<string> {
+	try {
+		return new Set(JSON.parse(localStorage.getItem(collapsedKey) ?? '[]') as string[]);
+	} catch {
+		return new Set();
+	}
+}
+
+function saveCollapsedSections() {
+	try {
+		localStorage.setItem(collapsedKey, JSON.stringify([...collapsedSections]));
+	} catch {
+		// ignore storage failures
+	}
+}
+
+// Make the recurring sub-sections collapsible (native-feel) without rewriting
+// every render function: add a chevron + a stable key, restore collapse state.
+function enhanceSections() {
+	document
+		.querySelectorAll<HTMLElement>(
+			'section.remote-calls > .section-head.compact, section.route-components > .section-head.compact',
+		)
+		.forEach((head) => {
+			const section = head.parentElement;
+			if (!section) return;
+			const key = head.querySelector('h3')?.textContent?.trim() ?? '';
+			if (!key) return;
+			section.classList.add('collapsible-section');
+			head.dataset.sectionKey = key;
+			head.tabIndex = 0;
+			head.setAttribute('role', 'button');
+			if (!head.querySelector('.section-chevron')) {
+				const chevron = document.createElement('span');
+				chevron.className = 'section-chevron';
+				chevron.innerHTML = sectionChevron;
+				head.appendChild(chevron);
+			}
+			const collapsed = collapsedSections.has(key);
+			section.classList.toggle('collapsed', collapsed);
+			head.setAttribute('aria-expanded', String(!collapsed));
+		});
+}
+
+function toggleSection(head: HTMLElement) {
+	const section = head.parentElement;
+	if (!head.dataset.sectionKey || !section) return;
+	const collapsed = !section.classList.contains('collapsed');
+	section.classList.toggle('collapsed', collapsed);
+	head.setAttribute('aria-expanded', String(!collapsed));
+	if (collapsed) collapsedSections.add(head.dataset.sectionKey);
+	else collapsedSections.delete(head.dataset.sectionKey);
+	saveCollapsedSections();
+}
+
+function animateActiveView() {
+	const el = document.querySelector<HTMLElement>('.panel .view:not(.hidden)');
+	if (!el) return;
+	el.classList.remove('view-enter');
+	void el.offsetWidth;
+	el.classList.add('view-enter');
+}
+
+document.addEventListener('click', (event) => {
+	const head = (event.target as Element | null)?.closest<HTMLElement>(
+		'.collapsible-section > .section-head.compact',
+	);
+	if (head) toggleSection(head);
+});
+
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Enter' && event.key !== ' ') return;
+	const head = (event.target as Element | null)?.closest<HTMLElement>(
+		'.collapsible-section > .section-head.compact',
+	);
+	if (!head) return;
+	event.preventDefault();
+	toggleSection(head);
+});
+
+// State pushed from the host page via the injected dock (theme + current route).
+let currentRoute = '';
+
+window.addEventListener('message', (event) => {
+	if (event.origin !== location.origin) return;
+	const data = event.data as { type?: string; scheme?: string; route?: string } | null;
+	if (data?.type !== 'sveltekit-devtools:host') return;
+	if ((data.scheme === 'dark' || data.scheme === 'light') && hostTheme !== data.scheme) {
+		hostTheme = data.scheme;
+		applySettings();
+	}
+	if (typeof data.route === 'string' && data.route !== currentRoute) {
+		currentRoute = data.route;
+		renderRoutesList();
+	}
+});
+
+// Fill in natural image dimensions on asset cards once each preview loads.
+assetsViewEl.addEventListener(
+	'load',
+	(event) => {
+		const img = event.target;
+		if (!(img instanceof HTMLImageElement) || !img.closest('.asset-preview')) return;
+		const dim = img.closest('.result-card')?.querySelector('[data-asset-dim]');
+		if (dim && img.naturalWidth) dim.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+	},
+	true,
+);
+
+function routeMatchesCurrent(routePath: string): boolean {
+	if (!currentRoute) return false;
+	const pathname = currentRoute.split('?')[0];
+	// route.path is normalized by routePathFromId(): :param, :param? (optional),
+	// *rest, and params embedded in a segment (e.g. foo-:id). Build a matcher.
+	const pattern = routePath
+		.split('/')
+		.map((seg) => {
+			if (/^\*[\w$]+$/.test(seg)) return '__REST__';
+			if (/^:[\w$]+\?$/.test(seg)) return '__OPT__';
+			return seg
+				.replace(/:[\w$]+\??/g, ' P ')
+				.replace(/\*[\w$]+/g, ' R ')
+				.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+				.replace(/ P /g, '[^/]+')
+				.replace(/ R /g, '[^/]*');
+		})
+		.join('/')
+		.replace(/\/__REST__/g, '(?:/.*)?')
+		.replace(/\/__OPT__/g, '(?:/[^/]+)?')
+		.replace(/__REST__/g, '.*')
+		.replace(/__OPT__/g, '[^/]*');
+	try {
+		return new RegExp(`^${pattern}/?$`).test(pathname);
+	} catch {
+		return false;
+	}
 }
 
 function setView(next: View) {
 	if (!isViewVisible(settings, next)) return;
 	view = next;
+	history.replaceState(null, '', `#${next}`);
 	render();
+	animateActiveView();
 	if (view === 'open-graph') void requestSeoMeta();
 }
 
@@ -681,9 +917,9 @@ async function runCommand(id: string) {
 
 function render() {
 	applySettings();
-	renderTabs();
-	renderMetrics();
+	renderRail();
 	renderRoutesList();
+	routesSidebarEl.classList.toggle('hidden', view !== 'routes');
 	overviewViewEl.classList.toggle('hidden', view !== 'overview');
 	routesViewEl.classList.toggle('hidden', view !== 'routes');
 	loadsViewEl.classList.toggle('hidden', view !== 'loads');
@@ -723,41 +959,37 @@ function render() {
 	renderVirtualFiles();
 	renderSettings();
 	renderPalette();
+	enhanceSections();
 }
 
-function renderTabs() {
-	if (!isViewVisible(settings, view)) view = 'overview';
-	document.querySelectorAll<HTMLButtonElement>('.tab[data-view]').forEach((tab) => {
-		const tabView = tab.dataset.view as View;
-		tab.classList.toggle('hidden', !isViewVisible(settings, tabView));
-		tab.classList.toggle('active', tabView === view);
-	});
-}
+function renderRail() {
+	if (!isViewVisible(settings, view)) {
+		view = 'overview';
+		history.replaceState(null, '', '#overview');
+	}
 
-function renderMetrics() {
-	const slowest = state.loads.reduce((max, event) => Math.max(max, event.duration), 0);
-	const server = state.loads.filter((event) => event.source === 'server').length;
-	const client = state.loads.length - server;
-	const fetches = loadFetchCount();
+	const tabs = railEntries
+		.filter((entry) => isViewVisible(settings, entry.view))
+		.map(
+			(entry) =>
+				`${entry.divider ? '<div class="rail-divider"></div>' : ''}<button class="rail-tab tab ${
+					entry.view === view ? 'active' : ''
+				}" type="button" data-view="${escapeAttr(entry.view)}" title="${escapeAttr(
+					viewLabels[entry.view],
+				)}" aria-label="${escapeAttr(viewLabels[entry.view])}">${icons[viewIcons[entry.view]] ?? ''}</button>`,
+		)
+		.join('');
 
-	text('#metric-project', state.project.name || '-');
-	text('#metric-routes', String(state.routes.length));
-	text('#metric-loads', String(state.loads.length));
-	text('#metric-fetches', String(fetches));
-	text('#metric-hook-events', String(state.hookEvents.length));
-	text('#metric-imports', String(state.imports.length));
-	text('#metric-env', String(state.runtimeConfig.env.length));
-	text('#metric-build-size', formatBytes(state.buildAnalysis.totalSize));
-	text('#metric-slowest', `${slowest} ms`);
-	text('#metric-sources', `${server} / ${client}`);
-	text('#metric-components', String(state.components.length));
-	text('#metric-remotes', String(state.remotes.length));
-	text('#metric-server-routes', String(state.serverRoutes.length));
-	text('#metric-actions', String(state.routeActions.length));
-	text('#metric-assets', String(state.assets.length));
-	text('#metric-virtual-files', String(state.virtualFiles.length));
-	text('#metric-modules', String(state.moduleGraph.totalModules));
-	text('#metric-tasks', String(state.tasks.length));
+	railEl.innerHTML = `<div class="rail-logo">${svelteLogo}</div>
+		${tabs}
+		<div class="rail-spacer"></div>
+		<div class="rail-footer">
+			<button class="rail-tab tab ${
+				view === 'settings' ? 'active' : ''
+			}" type="button" data-view="settings" title="Settings" aria-label="Settings">${icons.settings}</button>
+		</div>`;
+
+	viewTitleEl.innerHTML = `${icons[viewIcons[view]] ?? ''}<h1>${escapeHtml(viewLabels[view])}</h1>`;
 }
 
 function renderOverview() {
@@ -839,10 +1071,11 @@ function renderRoutesList() {
 		routes
 			.map((route) => {
 				const latest = latestLoad(route);
-				return `<button class="route-row ${route.id === selectedRoute ? 'active' : ''}" type="button" data-route="${escapeAttr(
-					route.id,
-				)}">
-				<span class="route-path">${escapeHtml(route.path)}</span>
+				const isCurrent = routeMatchesCurrent(route.path);
+				return `<button class="route-row ${route.id === selectedRoute ? 'active' : ''} ${
+					isCurrent ? 'current' : ''
+				}" type="button" data-route="${escapeAttr(route.id)}"${isCurrent ? ' aria-current="page"' : ''}>
+				<span class="route-path">${isCurrent ? '<span class="route-dot" title="Current page" aria-hidden="true"></span>' : ''}${escapeHtml(route.path)}</span>
 				<span class="badge ${latest ? 'hot' : ''}">${latest ? `${latest.duration} ms` : route.files.length}</span>
 			</button>`;
 			})
@@ -1028,20 +1261,40 @@ function renderLoads() {
 	</div>`;
 }
 
+let timelineKind = 'all';
+let timelineRecording = true;
+let timelineSnapshot: TimelineEvent[] | null = null;
+
 function renderTimeline() {
-	const events = timelineEvents(state);
+	const source = timelineRecording ? timelineEvents(state) : (timelineSnapshot ?? []);
+	const kinds = [...new Set(source.map((event) => event.kind))];
+	if (timelineKind !== 'all' && !kinds.includes(timelineKind)) timelineKind = 'all';
+	const events =
+		timelineKind === 'all' ? source : source.filter((event) => event.kind === timelineKind);
 	const max = Math.max(1, ...events.map((event) => event.duration));
 	timelineViewEl.innerHTML = `<div class="section-head">
 		<div>
 			<h2>Timeline</h2>
 			<p class="muted">Runtime load, hook, and remote calls in one stream.</p>
 		</div>
-		<span class="badge">${events.length} events</span>
+		<div class="timeline-controls">
+			<select data-timeline-kind aria-label="Filter by kind">
+				<option value="all" ${timelineKind === 'all' ? 'selected' : ''}>All kinds</option>
+				${kinds
+					.map(
+						(kind) =>
+							`<option value="${escapeAttr(kind)}" ${timelineKind === kind ? 'selected' : ''}>${escapeHtml(kind)}</option>`,
+					)
+					.join('')}
+			</select>
+			<button type="button" data-timeline-record>${timelineRecording ? '❙❙ Pause' : '● Record'}</button>
+			<span class="badge">${events.length} events</span>
+		</div>
 	</div>
 	<div class="load-list">
 		${
 			events.map((event) => renderTimelineRow(event, max)).join('') ||
-			`<div class="empty">Visit routes or run remote calls to collect events</div>`
+			`<div class="empty">${timelineRecording ? 'Visit routes or run remote calls to collect events' : 'Recording paused'}</div>`
 		}
 	</div>`;
 }
@@ -1444,6 +1697,17 @@ function renderSettings() {
 			<h3>Interface</h3>
 			<div class="tester">
 				<label>
+					<span class="muted">Theme</span>
+					<select data-setting-theme>
+						${(['auto', 'dark', 'light'] as const)
+							.map(
+								(theme) =>
+									`<option value="${theme}" ${settings.theme === theme ? 'selected' : ''}>${theme[0].toUpperCase()}${theme.slice(1)}</option>`,
+							)
+							.join('')}
+					</select>
+				</label>
+				<label>
 					<span class="muted">Scale</span>
 					<select data-setting-scale>
 						${['90', '100', '110']
@@ -1458,6 +1722,16 @@ function renderSettings() {
 					<input type="checkbox" data-setting-compact ${settings.compact ? 'checked' : ''} />
 					<span>Compact density</span>
 				</label>
+				<label>
+					<span class="muted">Editor (blank = auto-detect)</span>
+					<input
+						type="text"
+						data-setting-editor
+						value="${escapeAttr(settings.editor)}"
+						placeholder="code, cursor, webstorm…"
+					/>
+				</label>
+				<button type="button" data-reset-settings>Reset settings</button>
 			</div>
 		</article>
 		<article class="result-card">
@@ -1542,7 +1816,6 @@ async function runBuildAnalyze() {
 		buildAnalysis: (await response.json()) as BuildAnalysis,
 	};
 	renderBuildAnalyze();
-	renderMetrics();
 }
 
 function renderRuntimeEnvRow(item: RuntimeEnvVar) {
@@ -2328,6 +2601,11 @@ function renderAssetCard(asset: AssetInfo) {
 		</div>
 		<div class="meta-list">
 			${renderMetaRow('Type', asset.type)}
+			${
+				asset.preview === 'image'
+					? `<div class="meta-row"><span>Dimensions</span><strong data-asset-dim>…</strong></div>`
+					: ''
+			}
 			${renderMetaRow('Updated', new Date(asset.mtime).toLocaleString())}
 		</div>
 	</article>`;
@@ -2479,17 +2757,29 @@ function routeParamValues(route: SvelteKitRoute) {
 	return routeParamInputs[route.id];
 }
 
-async function openSourceFile(file: string) {
+async function openSourceFile(file: string, line?: number, column?: number) {
 	if (!file) return;
+	const target = file.startsWith('/') ? file : `${state.root}/${file}`;
+	const positioned = line ? `${target}:${line}${column ? `:${column}` : ''}` : target;
 
 	const rpc = await rpcClient();
-	if (!rpc) {
-		setStatus('Open file needs dock', 'error');
+	if (rpc) {
+		await rpc.call('vite:core:open-in-editor', positioned);
+		setStatus('Opened file', 'live');
 		return;
 	}
 
-	await rpc.call('vite:core:open-in-editor', file.startsWith('/') ? file : `${state.root}/${file}`);
-	setStatus('Opened file', 'live');
+	try {
+		const response = await fetch('/__sveltekit-devtools/api/open-in-editor', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ file: target, line, column, editor: settings.editor || undefined }),
+		});
+		if (!response.ok) throw new Error('Open in editor failed');
+		setStatus('Opened file', 'live');
+	} catch {
+		setStatus('Open file failed', 'error');
+	}
 }
 
 function openRoute(path: string) {
