@@ -285,8 +285,16 @@
 		try {
 			devtools = await readState();
 			selectedRoute ||= devtools.routes[0]?.id ?? '';
+			const selected =
+				devtools.routes.find((route) => route.id === selectedRoute) ?? devtools.routes[0];
+			selectedRoute = selected?.id ?? '';
+			if (selected) ensureRouteParamValues(selected);
 			if (!routeInput || routeInput === '/') {
-				routeInput = withAppBase(currentRoute || devtools.routes[0]?.path || '/');
+				routeInput = currentRoute
+					? withAppBase(currentRoute)
+					: selected
+						? routeOpenPath(selected)
+						: '/';
 			}
 			if (!seoRouteInput || seoRouteInput === '/') seoRouteInput = withAppBase(currentRoute || '/');
 			setStatus('Live', 'live');
@@ -392,6 +400,7 @@
 	}
 
 	function selectRoute(route: SvelteKitRoute) {
+		ensureRouteParamValues(route);
 		selectedRoute = route.id;
 		routeInput = routeOpenPath(route);
 		setView('routes');
@@ -402,16 +411,19 @@
 	}
 
 	function routeParamValues(route: SvelteKitRoute) {
-		const existing = routeParamInputs[route.id];
-		if (existing) return existing;
+		return routeParamInputs[route.id] ?? {};
+	}
+
+	function ensureRouteParamValues(route: SvelteKitRoute) {
+		if (routeParamInputs[route.id]) return;
 		const values = Object.fromEntries(
 			routePathParams(route.path).map((param) => [param.name, defaultRouteParamValue(param)]),
 		);
 		routeParamInputs = { ...routeParamInputs, [route.id]: values };
-		return values;
 	}
 
 	function setRouteParam(route: SvelteKitRoute, param: RoutePathParam, value: string) {
+		ensureRouteParamValues(route);
 		routeParamInputs = {
 			...routeParamInputs,
 			[route.id]: { ...routeParamValues(route), [param.name]: value },

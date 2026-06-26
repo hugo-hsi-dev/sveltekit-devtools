@@ -19,27 +19,33 @@
 	let container = $state<HTMLDivElement>();
 	let network: NetworkInstance | null = null;
 	let lastKey = '';
+	let renderToken = 0;
+	let destroyed = false;
 
 	let graph = $derived(componentGraphData(components));
 	$effect(() => {
 		const key = JSON.stringify([graph.nodes, graph.edges, selectedFile]);
-		if (container && key !== lastKey) {
+		if (!destroyed && container && key !== lastKey) {
 			lastKey = key;
-			void renderGraph();
+			void renderGraph(++renderToken);
 		}
 	});
 
 	onDestroy(() => {
+		destroyed = true;
+		renderToken += 1;
 		network?.destroy();
+		network = null;
 	});
 
-	async function renderGraph() {
+	async function renderGraph(token: number) {
 		await tick();
-		if (!container) return;
+		if (destroyed || token !== renderToken || !container) return;
 		const [{ DataSet }, { Network }] = await Promise.all([
 			import('vis-data/peer'),
 			import('vis-network/peer'),
 		]);
+		if (destroyed || token !== renderToken || !container) return;
 		network?.destroy();
 		network = new Network(
 			container,
