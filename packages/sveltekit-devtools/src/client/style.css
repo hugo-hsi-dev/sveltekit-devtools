@@ -231,10 +231,15 @@ h3 {
 	gap: 2px;
 	width: var(--nui-rail-width);
 	height: 100vh;
-	padding: 8px 6px;
+	padding: 8px 5px;
 	background: var(--nui-bg-base);
 	border-right: 1px solid var(--nui-border);
+	overflow-x: hidden;
 	overflow-y: auto;
+	scrollbar-width: none;
+}
+.rail::-webkit-scrollbar {
+	display: none;
 }
 
 .rail-logo {
