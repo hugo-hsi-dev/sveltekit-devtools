@@ -6,13 +6,13 @@ export interface RoutePathParam {
 export function routePathParams(path: string): RoutePathParam[] {
 	return path
 		.split('/')
-		.flatMap((segment) => {
+		.flatMap((segment): RoutePathParam[] => {
 			if (segment.startsWith(':')) {
 				const optional = segment.endsWith('?');
 				return [
 					{
 						name: segment.slice(1, optional ? -1 : undefined),
-						type: optional ? 'optional' : 'required',
+						type: optional ? ('optional' as const) : ('required' as const),
 					},
 				];
 			}

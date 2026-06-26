@@ -271,6 +271,12 @@ export interface VirtualFileInfo {
 	truncated: boolean;
 }
 
+export interface SeoTag {
+	tag: string;
+	name: string;
+	value: string;
+}
+
 export interface SeoMeta {
 	url: string;
 	pathname: string;
@@ -286,6 +292,7 @@ export interface SeoMeta {
 	twitterTitle: string;
 	twitterDescription: string;
 	twitterImage: string;
+	tags: SeoTag[];
 }
 
 export interface DevtoolsState {

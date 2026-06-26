@@ -99,6 +99,36 @@ export interface RailEntry {
 	divider?: boolean;
 }
 
+export interface NavCategory {
+	id: 'app' | 'server' | 'analyze';
+	label: string;
+	views: View[];
+}
+
+export const navCategories: NavCategory[] = [
+	{
+		id: 'app',
+		label: 'App',
+		views: ['routes', 'loads', 'timeline', 'hooks', 'components', 'open-graph'],
+	},
+	{
+		id: 'server',
+		label: 'Server',
+		views: ['server-routes', 'actions', 'remotes', 'runtime-config', 'tasks'],
+	},
+	{
+		id: 'analyze',
+		label: 'Analyze',
+		views: ['imports', 'assets', 'virtual-files', 'plugins', 'inspect', 'build-analyze'],
+	},
+];
+
+export const configurableCategories = navCategories.map((category) => category.id);
+
+export const viewToCategory = Object.fromEntries(
+	navCategories.flatMap((category) => category.views.map((view) => [view, category.id])),
+) as Partial<Record<View, NavCategory['id']>>;
+
 export const railEntries: RailEntry[] = [
 	{ view: 'overview' },
 	{ view: 'routes', divider: true },

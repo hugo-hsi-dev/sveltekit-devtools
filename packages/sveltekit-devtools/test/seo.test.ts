@@ -1,7 +1,13 @@
 import { expect, test } from 'vitest';
 
 import type { SeoMeta } from '../src/shared/types';
-import { bestSeoDescription, bestSeoTitle, missingSeoTags } from '../src/client/seo';
+import {
+	bestSeoDescription,
+	bestSeoTitle,
+	missingSeoItems,
+	missingSeoTags,
+	normalizeSeoTags,
+} from '../src/client/seo';
 
 const emptyMeta: SeoMeta = {
 	url: 'http://localhost:5173/',
@@ -18,6 +24,7 @@ const emptyMeta: SeoMeta = {
 	twitterTitle: '',
 	twitterDescription: '',
 	twitterImage: '',
+	tags: [],
 };
 
 test('reports missing SEO tags and derives preview text', () => {
@@ -36,4 +43,22 @@ test('reports missing SEO tags and derives preview text', () => {
 		'meta[property="og:image"]',
 		'meta[name="twitter:card"]',
 	]);
+	expect(missingSeoItems(meta)[0]?.explanation).toContain('Short page summary');
+	expect(normalizeSeoTags(meta).map((tag) => [tag.tag, tag.name, tag.value])).toEqual([
+		['title', '<title>', 'Page title'],
+		['meta', 'og:description', 'Social description'],
+	]);
+});
+
+test('drops partial raw SEO tags', () => {
+	expect(
+		normalizeSeoTags({
+			...emptyMeta,
+			tags: [
+				{ tag: 'meta', name: 'description', value: 'Page description' },
+				{ tag: 'meta', name: '', value: 'broken' },
+				{ tag: '', name: 'og:title', value: 'broken' },
+			],
+		}),
+	).toEqual([{ tag: 'meta', name: 'description', value: 'Page description' }]);
 });

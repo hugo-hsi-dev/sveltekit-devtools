@@ -106,7 +106,8 @@ function readSeoMeta() {
 		twitterCard: meta('name', 'twitter:card'),
 		twitterTitle: meta('name', 'twitter:title'),
 		twitterDescription: meta('name', 'twitter:description'),
-		twitterImage: meta('name', 'twitter:image')
+		twitterImage: meta('name', 'twitter:image'),
+		tags: readSeoTags()
 	};
 }
 
@@ -116,6 +117,26 @@ function meta(attribute, value) {
 
 function link(rel) {
 	return document.querySelector('link[rel="' + rel + '"]')?.getAttribute('href') || '';
+}
+
+function readSeoTags() {
+	const tags = [];
+	if (document.title) tags.push({ tag: 'title', name: '<title>', value: document.title });
+	for (const item of document.querySelectorAll('meta[name], meta[property]')) {
+		tags.push({
+			tag: 'meta',
+			name: item.getAttribute('name') || item.getAttribute('property') || '',
+			value: item.getAttribute('content') || ''
+		});
+	}
+	for (const item of document.querySelectorAll('link[rel]')) {
+		tags.push({
+			tag: 'link',
+			name: item.getAttribute('rel') || '',
+			value: item.getAttribute('href') || ''
+		});
+	}
+	return tags;
 }
 
 `;
